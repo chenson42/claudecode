@@ -276,13 +276,21 @@ export async function requestAccountDeletion(): Promise<ActionResult> {
     metadata: { stub: true },
   });
 
-  // TODO: Replace this stub with a real deletion flow. Two options:
-  //   1. Hard-delete cascade: capture actorEmail BEFORE delete, call
-  //      signOut(), then db.delete(users).where(eq(users.id, userId)).
-  //      auditEvents rows survive (actorUserId set null by cascade).
-  //   2. Soft-deactivation: set isActive=false, call signOut(). The proxy
-  //      already blocks deactivated users. Historical audit rows are preserved.
-  // Hard-delete vs soft-deactivate is a fork-specific choice.
+  // TODO: Replace this stub with a real deletion flow.
+  //
+  // CONSTRAINT (DECISION-015): the starter's signIn gate keys OAuth lookups off
+  // the user's email address. If a user row is hard-deleted, a deactivated user
+  // could re-register via Google OAuth (no row → adapter creates a fresh one).
+  // The mandated deletion strategy is therefore SOFT DEACTIVATION (isActive=false),
+  // NOT hard-delete. A hard-delete implementation must also add a `deleted_emails`
+  // blocklist (or equivalent) to preserve the OAuth re-registration block.
+  //
+  // Implementation shape for soft-deactivation:
+  //   await db.update(users).set({ isActive: false }).where(eq(users.id, userId));
+  //   await signOut({ redirect: false });
+  //
+  // The proxy already blocks deactivated users (isActive check on every request);
+  // the stale-JWT defense in the jwt callback evicts the token on next request.
 
   return {
     ok: true,

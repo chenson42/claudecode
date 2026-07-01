@@ -16,6 +16,7 @@ import {
   features,
 } from "@/lib/db/schema";
 import { authConfig } from "@/lib/auth/config";
+import { evaluateSignIn } from "@/lib/auth/sign-in-gate";
 import { ADMIN_ROLE, FEATURES, MEMBER_ROLE } from "@/lib/permissions";
 import { getRequestIp, checkRateLimit } from "@/lib/rate-limit";
 
@@ -124,17 +125,24 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async signIn({ user }) {
-      // Block sign-in if the user row is missing or inactive. Returning `true`
-      // on null would let a deleted user with a still-valid session re-create
-      // themselves through the adapter — a privilege bypass.
-      if (!user.id) return true; // brand-new OAuth user; adapter will create
-      const dbUser = await db.query.users.findFirst({
-        where: eq(users.id, user.id),
-        columns: { isActive: true },
-      });
-      if (!dbUser) return false;
-      return dbUser.isActive;
+    async signIn({ user, account }) {
+      // Delegate to the extracted gate so all branches are unit-testable.
+      // See src/lib/auth/sign-in-gate.ts and DECISION-015 for rationale:
+      //   - credentials → true unconditionally (authorize() already checked isActive)
+      //   - OAuth, no row → true (adapter will create the user row after this)
+      //   - OAuth, isActive=false → false (soft-deactivation block)
+      //   - OAuth, no email → false (fail-safe)
+      return evaluateSignIn(
+        account?.provider ?? "credentials",
+        user,
+        (email) =>
+          db.query.users
+            .findFirst({
+              where: eq(users.email, email),
+              columns: { isActive: true },
+            })
+            .then((row) => row ?? null),
+      );
     },
     // The `session` callback lives in the shared authConfig so the edge
     // runtime (proxy.ts) sees the same projection.
