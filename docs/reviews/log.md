@@ -20,6 +20,7 @@ Where `<type>` is one of:
 - `agent-instruction` (cadence: 30 days)
 - `dependencies` (cadence: 30 days)
 - `upstream-sync` (cadence: 14 days) — fork-only; N/A in the canonical starter
+- `downstream-sync` (cadence: 30 days) — fork-only; N/A in the canonical starter
 
 For substantial reviews that produce significant findings, also write `docs/reviews/YYYY-MM-DD-<type>.md` with the details and link it from the log entry like:
 
@@ -38,6 +39,7 @@ If three retrospectives in a row produce nothing, the cadence itself is suspect 
 ## Entries
 
 <!-- newest entries go here, above the older ones -->
+2026-07-01 | agent-instruction | Harvest Tier 3 applied: qa feature-gate table + no-self-agreeing-mocks, deployment-engineer force-push guardrail (+ Workflow Rule 11), pre-push CVE step, database-admin onDelete rule, api-developer email-escape rule
 2026-07-01 | test-coverage | Phase 5 sweep: 4 critical modules at 100% (permissions, two-factor, flags, safe-callback); overall 77.4% stmts; 175/175 unit tests green; 20/20 e2e tests green
 2026-05-18 | test-coverage | flags.ts and two-factor.ts brought to 100% coverage (6 + 28 tests); full suite 139/139 green; typecheck clean
 2026-05-17 | retrospective | first run; 0 loop-backs across 6 features; top risks: test coverage debt (two-factor.ts/proxy.ts at 0%), 2 security findings survived all phases (open redirect, enrollment loop), CLAUDE.md 3 versions behind; 6 edits proposed; see 2026-05-17-retrospective.md

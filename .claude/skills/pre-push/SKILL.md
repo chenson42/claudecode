@@ -114,6 +114,10 @@ If the seed (`scripts/seed.ts`) changed, suggest running `npm run db:seed` again
 
 Treat these as advisory warnings, not hard blockers (unless the user decides otherwise):
 
+- **`docs/TODO.md` reconciled?** (Workflow Rule 10.) If the outgoing commits ship, defer, or discover work, the corresponding TODO lines must move/appear in those same commits:
+  ```bash
+  git diff main...HEAD --name-only | grep -q "docs/TODO.md" || echo "WARN: no TODO.md change in this branch — verify nothing shipped/deferred/discovered"
+  ```
 - **New environment variables?** Documented in `CLAUDE.md` (and `.env.example` if present)?
 - **New tables or columns?** Defined in `src/lib/db/schema.ts`?
 - **New routes or actions?** Auth + feature gate present on every protected entry?
@@ -130,6 +134,19 @@ Treat these as advisory warnings, not hard blockers (unless the user decides oth
   git diff --name-only | grep -E "\.env"
   ```
 
+## Step 7b: Dependency CVE Audit
+
+```bash
+npm audit --audit-level=moderate
+```
+
+Severity gate:
+- **PASS** — no vulnerabilities, or `info`-level only.
+- **WARN** — `moderate` vulnerabilities only; list the advisory IDs as informational. Not a hard blocker, but surface them in the summary so the user can decide.
+- **FAIL** — one or more `high` or `critical` vulnerabilities; list the advisory IDs and ask the user whether to block the push.
+
+If `npm audit` times out or the registry is unreachable, record `WARN (registry unreachable)` and continue — don't let a transient network failure block a clean push.
+
 ## Step 8: Summary
 
 Report results:
@@ -138,6 +155,7 @@ Report results:
 - Production build: PASS / FAIL
 - Schema and migrations: in sync / pending (with details)
 - Release notes + version: updated / missing
+- Dependency CVE audit: PASS / WARN / FAIL (advisory IDs if any)
 - Housekeeping warnings: list them
 - **Ready to push? yes / no**
 - If no: list each item that must be resolved first

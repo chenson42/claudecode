@@ -92,6 +92,8 @@ END $$;
 - Unique constraints for natural keys (`users.email`, `roles.name`, `features.key`, `feature_flags.key`).
 - Use `uniqueIndex` for compound natural keys (`(role_id, feature_key)` in `role_features`).
 
+**When reviewing schema changes, audit every `onDelete` value.** Use `cascade` unless a concrete orphan-recovery surface exists — an admin UI or cron job that actively handles FK-nulled rows. `set null` without a recovery path creates silent data rot: sagacraft commit `3ba436c` left thousands of orphaned JSONB rows accumulating for months because the FK was `set null` with no code path to surface or clean them. If in doubt, prefer `cascade` and model soft-delete with a dedicated column instead.
+
 ### 6. Seeds
 
 `scripts/seed.ts` seeds the admin role, member role, every feature in `FEATURE_CATALOG`, and the role-feature bindings. When you add a new feature in `src/lib/permissions.ts`, the seed picks it up automatically — but you still need to bind it to a role explicitly if you want a role to grant it on a fresh install.

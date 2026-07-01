@@ -55,6 +55,8 @@ These are the user-visible flows that, if broken, render the starter unusable:
 
 The visual layout itself, copy that's expected to change per fork, and anything that just exercises Tailwind. Don't write tests that assert "the heading is blue" — that breaks every restyle.
 
+**No self-agreeing DB mocks.** For any test covering database-touching code, cover the real column contract (a typed Drizzle query or an integration test against an actual schema), not a mock that echoes the same column names as the implementation. A mock that assumes the same columns as the code will pass even when the column name is wrong — sagacraft `dfe7add` had exactly this pattern: a wrong column name 500'd in production for weeks while all mocked tests stayed green.
+
 ## Test Structure
 
 Use Arrange / Act / Assert, with whitespace between sections:
@@ -128,6 +130,23 @@ Failures: [...]
 - `src/lib/permissions.ts`: X%
 - `src/lib/two-factor.ts`: X%
 - `src/lib/flags.ts`: X%
+
+### Feature-Gate Audit (mandatory before PASS)
+
+For every protected route or server action this feature touched, confirm the correct gate is present and the right `FEATURES.*` key is checked. A missing or wrong gate is a FAIL even if every test passes.
+
+| Route or action | `auth()` present? | `hasFeature(...)` present? | Correct `FEATURES.*` key? |
+|-----------------|-------------------|----------------------------|----------------------------|
+| `GET /api/...` or `POST /api/...` | yes / no | yes / no | `FEATURES.X` or n/a |
+| `<server action name>` | yes / no | yes / no | `FEATURES.X` or n/a |
+
+**The audit is required because tests don't catch a missing gate.** A route that wrongly returns 200 to an under-privileged user still passes "happy path" tests. The pattern that motivated this check: two admin export routes shipped without `hasFeature()` — happy-path tests passed against either version. Verify by reading the route file and action body, not by inferring from passing tests.
+
+What to check:
+- Every `src/app/api/**/route.ts` the feature added or changed — confirm an `auth()` call and a `hasFeature(session.user.features, FEATURES.X)` check with the correct key.
+- Every `"use server"` action the feature added or changed — same check inside the action body.
+- Routes under `src/app/(admin)/admin/` are also covered by the `proxy.ts` edge gate, but proxy coverage is a complement to — not a substitute for — `hasFeature()` inside the handler.
+- If the feature touched no protected routes or actions, write "no protected routes touched" — don't skip the section silently.
 
 ### Auth-Touching Features — Stricter Gate
 

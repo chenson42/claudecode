@@ -90,6 +90,8 @@ src/
 scripts/
 └── seed.ts                  — Roles + features + demo flag seed
 docs/
+├── TODO.md                  — Backlog & follow-up ledger (reconcile in the same commit as the work)
+├── ui-standards.md          — UI conventions + pre-merge UX audit checklist (Phase 5 reference)
 ├── decisions.md             — ADR-style decision log
 ├── work-log/                — Per-feature pipeline tracking
 ├── reviews/                 — Review log + detail files
@@ -245,6 +247,7 @@ Eight reviews run on rolling cadences to keep the codebase, docs, security postu
 | **Agent & instruction** | 30 d | tech-lead | Agents and `.claude/` settings accumulate stale guidance, unused tools, and references to features that no longer exist; a monthly review keeps the instruction layer honest. |
 | **Dependencies** | 30 d | deployment-engineer | A monthly review of `npm outdated` and `npm audit` keeps the dependency graph current without inviting weekly churn. |
 | **Upstream sync** | 14 d | tech-lead | Derived-repo-only — N/A in the canonical starter. Works for true git forks *and* projects scaffolded from the starter (no shared git history). Surfaces commits on the upstream starter's `main` not yet pulled in; classifies each as must-pull / should-pull / optional / skip. Runs via the `upstream-sync` skill. |
+| **Downstream sync** | 30 d | tech-lead | Derived-repo-only — N/A in the canonical starter. The mirror of upstream sync: surfaces fork-made improvements (skills, agents, workflow strengthenings, reusable features) generic enough to contribute back to the canonical starter, as a classified punch-list. Runs via the `downstream-sync` skill. |
 
 Ownership claims for each review are reflected in the relevant agent file under `.claude/agents/` — read the named owner's agent file for the specifics of what each review covers and where its detail file lands.
 
@@ -253,9 +256,10 @@ Ownership claims for each review are reflected in the relevant agent file under 
 At session start, before responding to any non-trivial request:
 
 1. Read `docs/reviews/log.md`. Note any review type whose last entry exceeds its cadence — or has never been run.
-2. Read the most recent file in `docs/work-log/`. Note any in-flight work and which pipeline phase it is on.
-3. Classify the incoming request using the Classification table above.
-4. If any reviews are overdue, surface them before starting new work:
+2. Read `docs/TODO.md`. Note the In Flight and Next Up items — this is the backlog aggregator across all work.
+3. Read the most recent file in `docs/work-log/`. Note any in-flight work and which pipeline phase it is on.
+4. Classify the incoming request using the Classification table above.
+5. If any reviews are overdue, surface them before starting new work:
 
 > "Three reviews are due before we start:
 > - Test coverage: 12 days (last YYYY-MM-DD)
@@ -300,6 +304,8 @@ Slugs are short, lowercase, hyphenated, and stable. Don't rename them after the 
 7. **Audit security-sensitive mutations.** Role changes, flag toggles, TOTP enrolment/reset, deactivations write to `audit_events`.
 8. **No code before the work-log.** If you are about to call Edit, Write, or `git checkout -b` for a non-trivial request and there is no work-log entry for it, stop and run `/new-feature` first. The Classification table at the top of the Development Pipeline section defines "non-trivial."
 9. **Use `/merge-pr` for any PR merged with `--delete-branch`.** Before deleting the head branch, the skill retargets any open PRs whose base is that branch to `main`. Without it, `gh pr merge N --delete-branch` auto-closes every downstream PR — a known GitHub mechanic that bit the npvitals fork twice in a single session. Invoke once per PR, bottom-up, when merging a stack. Plain `gh pr merge` is only safe when the PR has no dependents *and* you're not deleting the branch.
+10. **Keep `docs/TODO.md` reconciled in the same commit as the work.** It is the single backlog aggregator. Shipping something? Move its line to Done (with date) in that commit. Deferring something, discovering a follow-up, or accepting a review punch-list item? Add a line in that commit. Phase 6 `SHIP WITH NOTES` follow-ups land here, not just in the work-log. A commit that changes what's open without touching `docs/TODO.md` is incomplete — `/pre-push` flags it.
+11. **Never amend or force-push to diagnose an external-system failure.** When the same commit suddenly yields a different deploy or CI result, the external system changed — not your code. Get ground truth from the failing service's dashboard before touching git history. Re-authoring commits fixes nothing when the cause is a Vercel account issue, a CI runner update, or a third-party integration outage.
 
 ## Commit Message Standards
 
