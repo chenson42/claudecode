@@ -12,36 +12,33 @@ import {
   getOrCreatePendingEnrollment,
   PENDING_TTL_MINUTES,
 } from "@/lib/totp-pending";
-import { regenerateRecoveryCodes } from "./actions";
+import { clearFreshCodesCookieAction } from "./actions";
 import { TotpEnrollForm } from "./totp-enroll-form";
 import { RegenerateCodesForm } from "./regenerate-codes-form";
 import { FormattedDate } from "@/components/shared/formatted-date";
-
-async function consumeFreshCodesCookie(): Promise<string[] | null> {
-  const jar = await cookies();
-  const raw = jar.get(FRESH_RECOVERY_CODES_COOKIE)?.value;
-  if (!raw) return null;
-  jar.delete(FRESH_RECOVERY_CODES_COOKIE);
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((s): s is string => typeof s === "string")
-      : null;
-  } catch {
-    return null;
-  }
-}
+import { FreshRecoveryCodes } from "@/components/shared/fresh-recovery-codes";
 
 export default async function AccountTwoFactorPage() {
   const session = await auth();
   if (!session?.user) redirect("/signin?callbackUrl=/account/2fa");
 
-  const [existing, freshCodes] = await Promise.all([
-    db.query.userTotp.findFirst({
-      where: eq(userTotp.userId, session.user.id),
-    }),
-    consumeFreshCodesCookie(),
-  ]);
+  const jar = await cookies();
+  const rawFreshCodes = jar.get(FRESH_RECOVERY_CODES_COOKIE)?.value ?? null;
+  let freshCodes: string[] | null = null;
+  if (rawFreshCodes) {
+    try {
+      const parsed = JSON.parse(rawFreshCodes);
+      freshCodes = Array.isArray(parsed)
+        ? parsed.filter((s): s is string => typeof s === "string")
+        : null;
+    } catch {
+      freshCodes = null;
+    }
+  }
+
+  const existing = await db.query.userTotp.findFirst({
+    where: eq(userTotp.userId, session.user.id),
+  });
 
   // Already enrolled — show management view
   if (existing) {
@@ -63,23 +60,10 @@ export default async function AccountTwoFactorPage() {
         </p>
 
         {freshCodes && (
-          <div className="mt-6 rounded-md border border-amber-500/40 bg-amber-500/10 p-4">
-            <h2 className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-              Save these recovery codes
-            </h2>
-            <p className="mt-1 text-xs">
-              Each code lets you sign in once if you lose your authenticator.
-              We hash codes at rest — this is the only time you&apos;ll see
-              them in plaintext.
-            </p>
-            <ul className="mt-3 grid grid-cols-2 gap-2 font-mono text-sm">
-              {freshCodes.map((c) => (
-                <li key={c} className="rounded bg-background px-2 py-1">
-                  {c}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <FreshRecoveryCodes
+            codes={freshCodes}
+            onDisplayed={clearFreshCodesCookieAction}
+          />
         )}
 
         <div className="mt-6 rounded-md border border-border p-4">

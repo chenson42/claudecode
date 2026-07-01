@@ -53,6 +53,21 @@ async function replaceRecoveryCodes(userId: string): Promise<string[]> {
 }
 
 // ---------------------------------------------------------------------------
+// clearFreshCodesCookieAction — called by the FreshRecoveryCodes client island
+// after it mounts and the codes are visible to the user. Running the delete
+// here (in a server action) is the only way to mutate cookies legally in
+// Next 16; doing it in an RSC render was the source of BUG-2.
+// ---------------------------------------------------------------------------
+
+export async function clearFreshCodesCookieAction() {
+  const jar = await cookies();
+  // Path must match the path used when the cookie was SET in setFreshRecoveryCodesCookie.
+  // A deletion sent without the matching Path attribute targets a different cookie
+  // entry in the browser jar and silently fails.
+  jar.delete({ name: FRESH_RECOVERY_CODES_COOKIE, path: "/account/2fa" });
+}
+
+// ---------------------------------------------------------------------------
 // prepareEnrollment — called server-side from the page, not a client action.
 // Returns the otpauth URI and plaintext secret for QR display.
 // ---------------------------------------------------------------------------
