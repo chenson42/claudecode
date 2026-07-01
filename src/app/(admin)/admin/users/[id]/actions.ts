@@ -74,6 +74,7 @@ export async function setTwoFactorRequired(input: {
 // The three DELETEs are sequential and idempotent. The Neon HTTP driver does
 // not support db.transaction() on the pooled connection, so we follow the same
 // pattern as resetEnrollmentAction in src/app/(admin)/admin/2fa/actions.ts.
+// For atomic multi-write, use db.batch() instead — see DECISION-014 in docs/decisions.md.
 //
 // Known gap: the target user's twoFactorVerified JWT claim stays true until
 // their JWT expires (typically 30 days). There is no session DB to invalidate

@@ -60,26 +60,27 @@ export default async function VerifyEmailPage({ params }: Props) {
   const oldEmail = userRow.email;
   const newEmail = tokenRow.newEmail;
 
-  // Apply the email change atomically
-  await db.transaction(async (tx) => {
-    await tx
+  // Apply the email change atomically.
+  // The Neon HTTP driver has no interactive db.transaction(); db.batch()
+  // runs all three statements as a single server-side transaction.
+  // See docs/decisions.md DECISION-014.
+  await db.batch([
+    db
       .update(users)
       .set({ email: newEmail })
-      .where(eq(users.id, tokenRow.userId));
-
-    await tx
+      .where(eq(users.id, tokenRow.userId)),
+    db
       .delete(emailVerificationTokens)
-      .where(eq(emailVerificationTokens.id, tokenRow.id));
-
-    await tx.insert(auditEvents).values({
+      .where(eq(emailVerificationTokens.id, tokenRow.id)),
+    db.insert(auditEvents).values({
       actorUserId: tokenRow.userId,
       actorEmail: newEmail,
       action: AUDIT_ACTIONS.USER_EMAIL_CHANGED,
       resourceType: "user",
       resourceId: tokenRow.userId,
       metadata: { oldEmail, newEmail },
-    });
-  });
+    }),
+  ] as unknown as Parameters<typeof db.batch>[0]);
 
   revalidatePath("/account");
 
