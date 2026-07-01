@@ -16,6 +16,21 @@ import { projectJWTOntoSession } from "./session-projection";
  */
 export const authConfig: NextAuthConfig = {
   secret: process.env.AUTH_SECRET,
+  // Trust the forwarded Host header so NextAuth builds OAuth callback URLs
+  // using the public hostname rather than the internal one.
+  //
+  // NextAuth 5 beta auto-enables this on Vercel (VERCEL env) and Cloudflare
+  // Pages (CF_PAGES env) but NOT on any other reverse proxy — nginx, Caddy,
+  // Kinsta, Railway, Fly.io, and Cloudflare Tunnel in production all require
+  // this explicit flag. Without it, OAuth callbacks use the internal hostname
+  // and every sign-in fails with UntrustedHost.
+  //
+  // Security assumption: the terminating proxy sets the Host header from the
+  // public hostname. Standard behaviour for any well-configured reverse proxy.
+  // Deployers who prefer an env-scoped opt-in can remove this line and set
+  // AUTH_TRUST_HOST=true (or AUTH_URL=https://myapp.com) in production — see
+  // DECISION-016 in docs/decisions.md for the full rationale.
+  trustHost: true,
   session: { strategy: "jwt" },
   providers: [],
   pages: { signIn: "/signin" },
