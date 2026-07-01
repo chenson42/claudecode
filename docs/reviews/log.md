@@ -38,6 +38,7 @@ If three retrospectives in a row produce nothing, the cadence itself is suspect 
 ## Entries
 
 <!-- newest entries go here, above the older ones -->
+2026-07-01 | test-coverage | Phase 5 sweep: 4 critical modules at 100% (permissions, two-factor, flags, safe-callback); overall 77.4% stmts; 175/175 unit tests green; 20/20 e2e tests green
 2026-05-18 | test-coverage | flags.ts and two-factor.ts brought to 100% coverage (6 + 28 tests); full suite 139/139 green; typecheck clean
 2026-05-17 | retrospective | first run; 0 loop-backs across 6 features; top risks: test coverage debt (two-factor.ts/proxy.ts at 0%), 2 security findings survived all phases (open redirect, enrollment loop), CLAUDE.md 3 versions behind; 6 edits proposed; see 2026-05-17-retrospective.md
 2026-05-17 | security | first run; 0 critical, 1 high, 4 medium, 3 low, 2 informational; top: open redirect (callbackUrl), email token plaintext, 2FA enrollment loop; see 2026-05-17-security.md
@@ -46,3 +47,5 @@ If three retrospectives in a row produce nothing, the cadence itself is suspect 
 2026-05-17 | agent-instruction | first run; 0 critical, 3 notable, 5 minor, 4 observations; top items: qa.md description has stale "no test runner" caveat, api-developer description claims schema-change ownership (blurs database-admin boundary), deployment-engineer env-var table missing 6 variables; see 2026-05-17-agent-instruction.md
 2026-05-17 | dependencies | first run; 0 urgent, 3 soon (@neondatabase/serverless major, typescript 6, eslint 10), 3 held (next-auth beta, drizzle-kit/esbuild CVE, next/postcss CVE); see 2026-05-17-dependencies.md
 2026-05-16 | test-coverage | first run; 1 of 9 critical modules covered (permissions.ts 100%); two-factor.ts, flags.ts, proxy.ts all at 0%; 7-item punch-list; see 2026-05-16-test-coverage.md
+2026-07-01 | downstream-sync-triage | 40 candidates triaged: 5 already done, 2 live bugs found (verify-email txn, 2FA RSC cookie), rest OPEN/PARTIAL/LOW — see 2026-07-01-starter-contribution-triage.md
+2026-07-01 | sibling-harvest | 7 sibling repos scanned (wlions, fpcw, sagacraft, huddleup, explore.press, fertilityluna, npvitals): 6 must-pull bugs/gaps, 9 should-pull, docs/process batch; email queue gap confirmed x3 — see 2026-07-01-sibling-harvest.md
