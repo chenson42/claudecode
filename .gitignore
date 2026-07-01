@@ -27,5 +27,5 @@ deck/slides.html
 
 # Test output
 coverage/
-test-results/
+/test-results/
 playwright-report/

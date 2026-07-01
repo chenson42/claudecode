@@ -7,6 +7,20 @@ description: Run pre-push verification — typecheck, build, schema/migration ch
 
 When the user invokes `/pre-push`, run every verification step required before pushing to `main`. This skill never pushes — it only reports readiness.
 
+## Step 0: Check for Open Test File (HARD STOP)
+
+Before doing anything else, check whether an open pre-merge test file exists:
+
+```bash
+ls docs/pre-merge-tests-v*.md 2>/dev/null && echo "EXISTS" || echo "CLEAR"
+```
+
+If any such file exists: **STOP immediately.** Do not proceed to any further steps. Tell the user which file was found:
+
+> `docs/pre-merge-tests-vX.Y.Z.md` is still open. Run `/test-results` to record the test results and close the file before pushing.
+
+Only continue to Step 1 if no file is found.
+
 ## Step 1: Snapshot the Current State
 
 Run, in parallel:
