@@ -73,7 +73,7 @@ export async function proxy(req: NextRequest) {
   // swallow /account/* routes. If you add a new route family that needs its own
   // access control, add an explicit rule to PROTECTION_RULES above.
   //
-  // Auth-only routes (no feature gate): /account, /account/2fa
+  // Auth-only routes (no feature gate): /home, /account, /account/2fa
   return NextResponse.next();
 }
 

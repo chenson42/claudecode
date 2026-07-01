@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { userTotp } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { sanitizeCallbackUrl } from "@/lib/auth/safe-callback";
 import { verifyTotpAction } from "./actions";
 
 export default async function TotpPage({
@@ -14,7 +15,7 @@ export default async function TotpPage({
   if (!session?.user) redirect("/signin");
 
   const sp = await searchParams;
-  const callbackUrl = sp.callbackUrl ?? "/admin";
+  const callbackUrl = sanitizeCallbackUrl(sp.callbackUrl);
 
   const enrollment = await db.query.userTotp.findFirst({
     where: eq(userTotp.userId, session.user.id),
@@ -26,8 +27,8 @@ export default async function TotpPage({
       {!enrollment ? (
         <p className="mt-4 text-sm text-muted-foreground">
           You haven&apos;t enrolled in 2FA yet. Visit{" "}
-          <a className="underline" href="/admin/2fa">
-            /admin/2fa
+          <a className="underline" href="/account/2fa">
+            /account/2fa
           </a>{" "}
           to set up your authenticator app, then come back here.
         </p>

@@ -65,6 +65,7 @@ src/
 │   ├── (account)/account/          — Self-serve account page (profile, email, password, delete)
 │   │   └── 2fa/                    — Per-user TOTP enrollment + management
 │   ├── (admin)/admin/              — Admin shell (users, flags, docs, 2fa subpages)
+│   ├── (member)/home/              — Post-login member home (greeting, roles, features, global nav)
 │   ├── (auth)/signin/              — Sign-in (Google OAuth)
 │   ├── (auth)/totp/                — TOTP enrolment + verification
 │   ├── (email-verify)/account/verify-email/[token]/  — Email-change verification landing
@@ -405,3 +406,9 @@ The `AUTH_TOTP_ENCRYPTION_KEY` is a 32-byte secret used to AES-GCM-encrypt the u
 ### Timezone-Safe Date Rendering
 
 Never call `toLocaleString()`, `toLocaleDateString()`, or `toLocaleTimeString()` directly in components. On Vercel (UTC), server-rendered timestamps always show UTC to the viewer. Use `<FormattedDate value={...} mode="date|datetime" />` from `src/components/shared/formatted-date.tsx` instead — it SSR-renders an ISO fallback and swaps in the viewer's local timezone after mount. An ESLint rule enforces this; the primitive file is the only exemption.
+
+### Post-Login Landing = /home
+
+After a successful sign-in (Credentials or Google OAuth), users land at `/home`. The default `callbackUrl` in `src/app/(auth)/signin/page.tsx` and the fallback in `src/lib/auth/safe-callback.ts` are both `/home`. Do not change either to `/admin` without explicit product intent — most users don't have `admin.dashboard` and will land on `/access-pending` if sent to `/admin`.
+
+The 2FA gate in `proxy.ts` applies to `/admin/*` routes only. `/home` is auth-only (any signed-in user, regardless of 2FA status, can reach it). Forks wanting a site-wide 2FA gate must add the check in `src/app/(member)/layout.tsx` or extend `proxy.ts` with an `isMemberRoute` block.

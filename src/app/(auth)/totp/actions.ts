@@ -17,20 +17,12 @@ import {
 } from "@/lib/two-factor";
 import { AUDIT_ACTIONS } from "@/lib/audit";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { sanitizeCallbackUrl } from "@/lib/auth/safe-callback";
 
 function totpRedirectUrl(callbackUrl: string, error?: "invalid" | "rate_limited"): string {
   const params = new URLSearchParams({ callbackUrl });
   if (error) params.set("error", error);
   return `/totp?${params.toString()}`;
-}
-
-/**
- * Validates that a callbackUrl is a safe same-origin relative path.
- * Rejects protocol-relative URLs (starting with "//") and any absolute URL.
- * Defaults to /admin if the value is absent or invalid.
- */
-function sanitizeCallbackUrl(raw: string): string {
-  return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/admin";
 }
 
 async function logAttempt(
@@ -55,7 +47,7 @@ export async function verifyTotpAction(formData: FormData) {
 
   const rawInput = String(formData.get("token") ?? "");
   const callbackUrl = sanitizeCallbackUrl(
-    String(formData.get("callbackUrl") ?? "/admin"),
+    formData.get("callbackUrl") as string | null,
   );
 
   const enrollment = await db.query.userTotp.findFirst({

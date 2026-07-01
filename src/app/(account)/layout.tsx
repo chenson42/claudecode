@@ -23,7 +23,7 @@ export default async function AccountLayout({
     <div className="grid min-h-screen grid-cols-[220px_1fr]">
       <aside className="border-r border-border bg-muted/40 p-4">
         <div className="mb-6">
-          <Link href="/" className="text-sm font-semibold">
+          <Link href="/home" className="text-sm font-semibold">
             ← Home
           </Link>
         </div>

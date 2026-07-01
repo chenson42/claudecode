@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function AccessPending() {
   return (
     <main className="mx-auto max-w-md px-6 py-24">
@@ -6,6 +8,12 @@ export default function AccessPending() {
         Your account exists, but doesn&apos;t yet have permission for this area.
         Ask an administrator to grant you the right role.
       </p>
+      <Link
+        href="/home"
+        className="mt-6 inline-block text-sm text-muted-foreground underline-offset-4 hover:underline"
+      >
+        ← Back to home
+      </Link>
     </main>
   );
 }

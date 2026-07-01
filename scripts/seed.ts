@@ -141,12 +141,133 @@ async function seedLocalAdmin() {
   }
 }
 
+async function seedMemberUser() {
+  const email = (process.env.SEED_MEMBER_EMAIL ?? "").toLowerCase().trim();
+  const password = process.env.SEED_MEMBER_PASSWORD ?? "";
+
+  if (!email || !password) {
+    console.warn(
+      "[seed] SEED_MEMBER_EMAIL / SEED_MEMBER_PASSWORD not set — skipping member seed. " +
+        "Set both in .env.local to provision a credentials-login member for e2e testing.",
+    );
+    return;
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+
+  const existing = await db.query.users.findFirst({
+    where: eq(schema.users.email, email),
+  });
+
+  let userId: string;
+  if (existing) {
+    await db
+      .update(schema.users)
+      .set({
+        password: hash,
+        isActive: true,
+        name: existing.name ?? "Local Member",
+      })
+      .where(eq(schema.users.id, existing.id));
+    userId = existing.id;
+    console.log(`[seed] updated local member: ${email}`);
+  } else {
+    const [created] = await db
+      .insert(schema.users)
+      .values({
+        email,
+        name: "Local Member",
+        password: hash,
+        emailVerified: new Date(),
+        twoFactorRequired: false,
+      })
+      .returning({ id: schema.users.id });
+    userId = created.id;
+    console.log(`[seed] created local member: ${email}`);
+  }
+
+  const memberRole = await db.query.roles.findFirst({
+    where: eq(schema.roles.name, MEMBER_ROLE),
+  });
+  if (memberRole) {
+    await db
+      .insert(schema.userRoles)
+      .values({ userId, roleId: memberRole.id })
+      .onConflictDoNothing();
+    console.log("[seed] bound local member to member role");
+  }
+}
+
+async function seedMfaAdminUser() {
+  const email = (process.env.SEED_MFA_ADMIN_EMAIL ?? "").toLowerCase().trim();
+  const password = process.env.SEED_MFA_ADMIN_PASSWORD ?? "";
+
+  if (!email || !password) {
+    console.warn(
+      "[seed] SEED_MFA_ADMIN_EMAIL / SEED_MFA_ADMIN_PASSWORD not set — skipping MFA admin seed. " +
+        "Set both in .env.local to provision a 2FA-gated admin for e2e routing tests.",
+    );
+    return;
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+
+  const existing = await db.query.users.findFirst({
+    where: eq(schema.users.email, email),
+  });
+
+  let userId: string;
+  if (existing) {
+    await db
+      .update(schema.users)
+      .set({
+        password: hash,
+        isActive: true,
+        name: existing.name ?? "Local MFA Admin",
+        // Preserve twoFactorRequired=true on re-seed — do not flip it back.
+        twoFactorRequired: true,
+      })
+      .where(eq(schema.users.id, existing.id));
+    userId = existing.id;
+    console.log(`[seed] updated local MFA admin: ${email}`);
+  } else {
+    const [created] = await db
+      .insert(schema.users)
+      .values({
+        email,
+        name: "Local MFA Admin",
+        password: hash,
+        emailVerified: new Date(),
+        // twoFactorRequired=true so proxy gates /admin routes behind TOTP.
+        // No TOTP enrollment record is created — the e2e test only asserts the
+        // redirect to /totp fires, not that the full challenge can be completed.
+        twoFactorRequired: true,
+      })
+      .returning({ id: schema.users.id });
+    userId = created.id;
+    console.log(`[seed] created local MFA admin: ${email}`);
+  }
+
+  const adminRole = await db.query.roles.findFirst({
+    where: eq(schema.roles.name, ADMIN_ROLE),
+  });
+  if (adminRole) {
+    await db
+      .insert(schema.userRoles)
+      .values({ userId, roleId: adminRole.id })
+      .onConflictDoNothing();
+    console.log("[seed] bound local MFA admin to admin role");
+  }
+}
+
 async function main() {
   await seedRoles();
   await seedFeatures();
   await seedFlags();
   await bindAdminFeatures();
   await seedLocalAdmin();
+  await seedMemberUser();
+  await seedMfaAdminUser();
   console.log("done.");
 }
 

@@ -4,6 +4,95 @@ Architectural and implementation decisions for the Claude Code Starter. Newest f
 
 ---
 
+## DECISION-013: `sanitizeCallbackUrl` extracted to shared helper; fallback changed to `/home`
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-post-login-routing-and-e2e`
+
+### Decision
+
+`sanitizeCallbackUrl` was a private function in `src/app/(auth)/totp/actions.ts`. With the post-login routing feature, the same validation is needed in `src/app/(auth)/signin/page.tsx` (which was passing the raw `callbackUrl` searchParam unsanitized to `signIn()`). The function is extracted to `src/lib/auth/safe-callback.ts` so both callers share a single implementation.
+
+The fallback return value changes from `/admin` to `/home` throughout (the new post-login landing). All existing callers that previously relied on `?? "/admin"` are updated to pass through `sanitizeCallbackUrl(raw)` with no manual fallback.
+
+Function contract:
+```typescript
+// src/lib/auth/safe-callback.ts
+export function sanitizeCallbackUrl(raw: string | undefined | null): string {
+  if (!raw) return "/home";
+  return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/home";
+}
+```
+
+### Rationale
+
+1. **`signin/page.tsx` was unsanitized.** The sign-in page read `sp.callbackUrl` from the URL query string and passed it directly to `signIn("google", { redirectTo: ... })` and `signIn("credentials", { redirectTo: ... })`. NextAuth 5 beta.31 performs internal same-origin validation, but relying on undocumented beta internals for a security property is insufficient — particularly when the codebase already has an explicit sanitization function for exactly this class of attack.
+
+2. **DRY over duplication.** The validation logic (reject `//` prefix, reject non-`/` prefix, fallback) would otherwise be duplicated across two callers. A shared helper is the obvious canonical location.
+
+3. **Fallback to `/home` not `/admin`.** After this feature ships, the correct post-login landing is `/home`. A fallback to `/admin` is wrong for most users (who lack `admin.dashboard`) and would send them to `/access-pending` on an invalid callback. `/home` is the correct safe default.
+
+### Alternatives Rejected
+
+- **Leave `signin/page.tsx` unsanitized and rely on NextAuth's `redirectTo` validation:** Rejected because NextAuth 5 beta behavior is not specified in its changelog and may change between beta versions. Explicit sanitization is the safer and more consistent choice.
+- **Inline the check in each caller:** Rejected because duplicated logic with independent fallback values would diverge on the next change.
+
+### Impact
+
+- Adds `src/lib/auth/safe-callback.ts`.
+- `src/app/(auth)/signin/page.tsx`: import `sanitizeCallbackUrl`; replace `sp.callbackUrl ?? "/admin"` with `sanitizeCallbackUrl(sp.callbackUrl)`.
+- `src/app/(auth)/totp/actions.ts`: remove local `sanitizeCallbackUrl` function; add import from shared location.
+- `src/app/(auth)/totp/page.tsx`: replace `sp.callbackUrl ?? "/admin"` with `sanitizeCallbackUrl(sp.callbackUrl)`; add import.
+
+---
+
+## DECISION-012: Member home route group, global nav placement, and post-login landing invariant
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-post-login-routing-and-e2e`
+
+### Decisions
+
+**1. Member home route:** `src/app/(member)/home/page.tsx` with a group-level layout at `src/app/(member)/layout.tsx`.
+
+The `(member)` route group is the home for authenticated member-facing pages that are not part of the admin shell or the account settings area. `/home` is the only route in the group initially; the group name signals that future member-facing pages (a notifications page, a billing summary, etc.) belong here rather than in `(admin)` or `(account)`.
+
+Alternatives rejected:
+- Top-level `src/app/home/page.tsx` with no route group: possible but provides no layout seam to attach the global nav without the nav bleeding into unrelated routes.
+- `(app)` as the group name: rejected — "app" is ambiguous in a Next.js context (`src/app/` already IS the app directory). `(member)` is explicit about the audience.
+
+**2. Global nav component:** `src/components/shared/global-nav.tsx` — a Server Component.
+
+Rendered only inside `src/app/(member)/layout.tsx`. It does NOT appear in:
+- The root layout (`src/app/layout.tsx`) — that would bleed into signin, access-pending, and public pages.
+- The admin shell layout (`src/app/(admin)/admin/layout.tsx`) — admin has its own sidebar nav; double-nav is wrong.
+- The account layout (`src/app/(account)/layout.tsx`) — account has its own sidebar nav.
+
+Server/client split: the global nav is a pure Server Component. It receives the session object from the parent layout (which calls `auth()`) and renders the conditional Admin link server-side by checking `session.user.features?.includes(FEATURES.ADMIN_DASHBOARD)`. No `useSession()` needed. No client component needed. Sign-out is implemented as an inline `"use server"` form action, identical to the pattern already used in `(admin)/admin/layout.tsx` and `(account)/layout.tsx`.
+
+**3. `proxy.ts` changes:** None required for route protection. `/home` is not in `PUBLIC_PATHS` and not in `PROTECTION_RULES`, so it falls through to the auth-only block (line 65-77 of `proxy.ts`). Only change: update the comment at line 76 to include `/home` in the list of documented auth-only routes.
+
+**4. Post-login landing invariant:** The default `callbackUrl` in `src/app/(auth)/signin/page.tsx` and the fallback in `src/app/(auth)/totp/actions.ts` must both change from `/admin` to `/home`. This is a load-bearing invariant: any future code that hard-codes `/admin` as a post-auth destination is wrong unless the user specifically requested the admin area. Documenting as an explicit starter invariant in CLAUDE.md.
+
+**5. `(account)/layout.tsx` sidebar:** The "← Home" link currently points to `/`. After this feature, it should point to `/home` (the post-login landing). Tech-lead must update this link.
+
+**6. `access-pending/page.tsx`:** Should gain a link back to `/home` after this feature ships, so users who are bounced to access-pending have an escape route. Not a blocker but must be addressed in Phase 4.
+
+### Invariants not changed
+
+- No new npm dependencies. Confirmed unnecessary.
+- No schema change.
+- The 2FA gate does not apply to `/home`. This is intentional — `proxy.ts` only enforces `twoFactorRequired && !twoFactorVerified` for `isAdminRoute` paths. The decision to NOT gate the member home behind 2FA must be stated explicitly in the Phase 3 design doc so forks that want site-wide 2FA know where to add the check.
+
+### CLAUDE.md updates (tech-lead must carry into Phase 3)
+
+- Project Layout section: add `(member)/home/` entry.
+- Key Invariants section: add "Post-Login Landing = /home" invariant, including the proxy fall-through note.
+
+---
+
 ## DECISION-011: Repository renamed from `claudecode` to `claudecode-nextjs-starter`
 
 **Status:** Resolved

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signIn } from "@/auth";
+import { sanitizeCallbackUrl } from "@/lib/auth/safe-callback";
 
 export default async function SignInPage({
   searchParams,
@@ -7,7 +8,7 @@ export default async function SignInPage({
   searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }) {
   const sp = await searchParams;
-  const callbackUrl = sp.callbackUrl ?? "/admin";
+  const callbackUrl = sanitizeCallbackUrl(sp.callbackUrl);
 
   return (
     <main className="mx-auto max-w-sm px-6 py-24">
