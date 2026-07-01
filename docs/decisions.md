@@ -4,6 +4,95 @@ Architectural and implementation decisions for the Claude Code Starter. Newest f
 
 ---
 
+## DECISION-015: `signIn` callback — drop credentials belt-and-suspenders lookup; OAuth gate uses email key
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-oauth-first-signin-accessdenied` (BUG-3)
+
+### Decision
+
+Two sub-decisions bundled because they shape the same extracted gate function:
+
+**1. Drop the credentials double-check in `signIn`.**
+The current `signIn` callback performs a `db.query.users.findFirst({ where: eq(users.id, user.id) })` for all providers, including credentials. For credentials sign-ins this is redundant: `authorize()` already looks up the user by email, checks `!user.isActive`, and returns `null` (causing NextAuth to short-circuit before calling `signIn`) if the user is inactive. By the time `signIn` is invoked for a credentials user, `authorize()` has already validated the user and returned their real DB UUID as `user.id`. The extra lookup adds a round-trip that produces no new information. The gate function for the credentials branch returns `true` unconditionally.
+
+Defense-in-depth is preserved by two other mechanisms: (a) `authorize()` itself checks `isActive` before returning; (b) the stale-JWT check in the `jwt` callback re-reads `isActive` on every subsequent request and returns `{}` (signout) if the row has been deactivated.
+
+**2. OAuth branch uses verified email as the lookup key.**
+Auth.js v5 runs the `signIn` callback before the adapter creates a new user row. On a first-time Google sign-in, `user.id` is Google's `sub` string (not a DB UUID), so an id-keyed lookup always misses. The fix keys the OAuth lookup off `user.email` (which Google verifies at token issuance). Logic: no row → allow (adapter will create); row with `isActive = true` → allow; row with `isActive = false` → deny.
+
+The extracted gate function (`src/lib/auth/sign-in-gate.ts`) takes the provider name and an injected `findUserByEmail` dependency so all four branches are unit-testable without a real database.
+
+### Deletion strategy constraint
+
+The email-keyed gate is only sound as long as deactivated user rows remain in the database. The starter's mandated deletion strategy is **soft deactivation (`isActive = false`)** — hard-delete is prohibited. The delete-account stub (`src/app/(account)/account/actions.ts:279`) must document this constraint when it is implemented. If a future implementer chooses hard-delete, an additional guard (e.g. a `deleted_emails` blocklist) is required alongside the email-keyed check.
+
+### Alternatives rejected
+
+- **Keep the credentials double-check:** Rejected because it is a dead round-trip with no safety benefit beyond what `authorize()` and the JWT stale check already provide. "Belt and suspenders" is not a free call on every credentials sign-in.
+- **Inline fix in `src/auth.ts` (explore.press minimal approach):** Viable but not unit-testable without mocking the Drizzle `db` object directly, which is fragile. The extracted DI'd gate follows the `safe-callback.ts` precedent already established in `src/lib/auth/`.
+
+### Impact
+
+- Adds `src/lib/auth/sign-in-gate.ts` with `evaluateSignIn(provider, user, findUserByEmail)`.
+- Adds `src/lib/auth/sign-in-gate.test.ts` with four unit tests.
+- `src/auth.ts` `signIn` callback: replace the current 8-line id-keyed lookup with a single `evaluateSignIn(...)` call.
+
+---
+
+## DECISION-014: Keep `drizzle-orm/neon-http`; `db.batch()` is the project convention for atomic multi-write
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-verify-email-neon-http-transaction` (BUG-1)
+
+### Decision
+
+The DB connection (`src/lib/db/index.ts`) stays on `drizzle-orm/neon-http`. The fix for the `db.transaction()` call in the verify-email page uses `db.batch([...])`, and `db.batch()` is codified as the project-wide convention for any group of writes that must be atomic.
+
+### Rationale
+
+1. **Switching drivers is an architectural decision, not a bug fix.** Migrating from `neon-http` to `neon-serverless` would enable `db.transaction()`, but it changes the connection model (WebSocket vs. HTTP), affects cold-start latency, and requires a separate pooling configuration review. That work belongs in its own pipeline entry, not inside a bug fix for a single page.
+
+2. **`db.batch()` is a correct and proven solution.** Neon executes all statements in a `db.batch()` call as a single server-side transaction — atomicity is fully preserved. The explore.press fork resolved an identical class of defect with `db.batch()` in commit `d55a165` and the fix has been running in production since 2026-06-19.
+
+3. **`neon-http` is the right default for the starter's serverless target.** The starter ships Vercel-ready. HTTP-based connections work without WebSocket support (which some edge runtimes restrict) and need no persistent connection management. The serverless driver is the correct pick for the majority of fork deployments.
+
+4. **Documenting the constraint as a convention prevents recurrence.** The admin actions file (`src/app/(admin)/admin/users/[id]/actions.ts:74-76`) already contains a prose comment about the constraint. Adding it to `docs/decisions.md` elevates it from a local comment to a searchable project rule.
+
+### Convention going forward
+
+When two or more writes must be atomic and no write depends on a mid-batch intermediate result, use:
+
+```typescript
+await db.batch([
+  db.update(table).set({ ... }).where(...),
+  db.delete(otherTable).where(...),
+  db.insert(auditEvents).values({ ... }),
+] as unknown as Parameters<typeof db.batch>[0]);
+```
+
+The `as unknown as Parameters<typeof db.batch>[0]` cast is required because Drizzle's batch type parameter is strict about element types; the double-cast is the minimal workaround consistent with explore.press's proven pattern. If a future Drizzle version relaxes the type, the cast can be removed without functional change.
+
+When the batch list is dynamic (variable length at runtime), build the array first then cast on the `await` call — identical pattern, same cast.
+
+### When `db.batch()` is NOT sufficient
+
+If write N depends on a value produced by write N-1 (e.g., an insert that returns a generated ID needed by the next insert), `db.batch()` cannot be used because a batch cannot consume its own intermediate results. In that case either: (a) pre-read the needed value before the batch, or (b) switch to `neon-serverless` for that action file. Document the exception in the action file comment.
+
+### Alternatives Rejected
+
+- **Switch to `drizzle-orm/neon-serverless` now:** Deferred. Correct long-term option for teams that need interactive transactions with mid-write reads, but an architectural change that deserves its own pipeline entry.
+- **Sequential writes (huddleup's idempotent approach):** Viable only if each write is independently safe to retry. The verify-email page's three writes are not idempotent in the same way — a second email-update after token deletion would silently succeed. `db.batch()` is strictly safer.
+
+### Impact
+
+- `src/app/(email-verify)/account/verify-email/[token]/page.tsx`: `db.transaction()` → `db.batch()`.
+- `src/app/(admin)/admin/users/[id]/actions.ts`: comment stays as-is (it documents why NOT to use `db.transaction()`; now also references this decision by number).
+
+---
+
 ## DECISION-013: `sanitizeCallbackUrl` extracted to shared helper; fallback changed to `/home`
 
 **Status:** Resolved
