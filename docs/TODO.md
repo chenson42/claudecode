@@ -18,11 +18,6 @@ detail lives in the linked doc, not here.
 
 - [ ] `/test` + `/test-results` skills port — in progress (doc-only)
 - [ ] Push `feat/post-login-routing-and-e2e` (2 commits ready, awaiting `/pre-push` + user push) and open the PR
-- [ ] `check:sql-date` tripwire — Phase 3 complete, advancing to full-stack-developer Phase 4 — `docs/work-log/2026-07-01-sql-date-tripwire.md`
-- [ ] `cache()`-wrap `isFlagEnabled` + `cachedAuth` (Scope 1+2; empirical: 2× Tier-A fires confirmed) — Phase 3 complete, advancing to full-stack-developer Phase 4 — `docs/work-log/2026-07-01-flag-caching.md`
-- [ ] Opportunistic expired-token GC — Phase 3 complete, advancing to api-developer Phase 4 — `docs/work-log/2026-07-01-token-gc.md`
-- [ ] `auth.local_login` + `auth.require_2fa` admin flags — Phase 3 complete, advancing to api-developer Phase 4 — `docs/work-log/2026-07-01-auth-mode-flags.md`
-- [ ] pendingTaken expiresAt-filter bug (requestEmailChange cross-user collision check) — Phase 2 skipped (bug-fix variant), advancing to tech-lead Phase 3 — `docs/work-log/2026-07-01-pending-email-expiry-filter.md`
 
 ## Next Up
 
@@ -59,3 +54,8 @@ detail lives in the linked doc, not here.
 - [x] 2026-07-01 — Report-only CSP + HSTS preload removal — SHIP IT — `docs/work-log/2026-07-01-security-headers.md`
 - [x] 2026-07-01 — ACCESS_DENIED audit event on /access-pending bounce — SHIP IT — `docs/work-log/2026-07-01-access-denied-audit.md`
 - [x] 2026-07-01 — Per-account login lockout (5-failure → 15-min DB-persisted lock, npvitals bug fix, Gap 2–4 fixes) — SHIP IT — `docs/work-log/2026-07-01-account-lockout.md`
+- [x] 2026-07-01 — pendingTaken expiresAt-filter bug (requestEmailChange cross-user collision check) — SHIP IT — `docs/work-log/2026-07-01-pending-email-expiry-filter.md`
+- [x] 2026-07-01 — check:sql-date tripwire (catch sql<Date> compile-time lie; umbrella check script; pre-push Step 3c) — SHIP IT — `docs/work-log/2026-07-01-sql-date-tripwire.md`
+- [x] 2026-07-01 — Opportunistic expired-token GC (daily /api/cron/maintenance; passwordResetTokens + emailVerificationTokens + userTotpPendingEnrollments) — SHIP IT — `docs/work-log/2026-07-01-token-gc.md`
+- [x] 2026-07-01 — cache()-wrap isFlagEnabled + cachedAuth (Scope 1+2; eliminates 2× Tier-A SELECT per request; corrects false framework comment) — SHIP IT — `docs/work-log/2026-07-01-flag-caching.md`
+- [x] 2026-07-01 — auth.local_login + auth.require_2fa admin flags (OAuth-only endpoint gate, org 2FA master switch, fail-open postures, e2e green) — SHIP IT — `docs/work-log/2026-07-01-auth-mode-flags.md`

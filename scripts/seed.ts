@@ -56,6 +56,28 @@ async function seedFlags() {
       description: "Demo flag wired into /admin to show the pattern.",
       enabled: false,
     },
+    {
+      key: "auth.local_login",
+      // ON: credentials sign-in (email + password) is available. Seeded ON —
+      // required for e2e global-setup (all three seeded users authenticate via
+      // credentials). Turn OFF to make this deployment Google-OAuth-only;
+      // authorize() rejects the credentials endpoint even if a POST is
+      // crafted directly.
+      description:
+        "Enable email + password sign-in. OFF = OAuth-only; credentials endpoint is blocked.",
+      enabled: true,
+    },
+    {
+      key: "auth.require_2fa",
+      // ON: effective twoFactorRequired = dbUser.twoFactorRequired AND this flag.
+      // Seeded ON — required to keep the seeded MFA admin e2e test green (that
+      // user has twoFactorRequired=true in DB; without this flag the proxy gate
+      // does not fire). Turn OFF to globally disable forced 2FA regardless of
+      // per-user column.
+      description:
+        "Org-level 2FA master switch. OFF = no user is TOTP-gated regardless of per-user column.",
+      enabled: true,
+    },
   ];
   for (const f of defaults) {
     await db.insert(schema.featureFlags).values(f).onConflictDoNothing();

@@ -26,6 +26,10 @@ import {
   LOCKOUT_DURATION_SECONDS,
 } from "@/lib/auth/lockout";
 import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
+import {
+  isLocalLoginEnabled,
+  computeEffectiveTwoFactor,
+} from "@/lib/auth/local-login";
 
 const INITIAL_ADMIN_EMAILS = (process.env.INITIAL_ADMIN_EMAILS ?? "")
   .split(",")
@@ -98,6 +102,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const email = (credentials?.email as string | undefined)?.toLowerCase();
         const password = credentials?.password as string | undefined;
         if (!email || !password) return null;
+
+        // Step 0: auth.local_login flag check — BEFORE rate limit so a
+        // disabled-flag rejection does not consume rate-limit budget on a
+        // permanently-blocked code path. Fail-open: missing row or DB error
+        // → allow credentials through (DECISION-026).
+        const localLoginEnabled = await isLocalLoginEnabled();
+        if (!localLoginEnabled) return null;
 
         // Rate limit: 5/min keyed by ip:email composite.
         // NextAuth 5 beta passes the original Request as the second arg.
@@ -264,7 +275,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         return {};
       }
       token.isActive = dbUser.isActive;
-      token.twoFactorRequired = dbUser.twoFactorRequired;
+      // Effective twoFactorRequired: raw column value AND the org-level
+      // auth.require_2fa master switch. Short-circuits when column is false
+      // (no flag read needed). Falls back to raw column on DB error so a DB
+      // blip does not accidentally ungate TOTP-required users. See DECISION-026.
+      token.twoFactorRequired = await computeEffectiveTwoFactor(
+        dbUser.twoFactorRequired,
+      );
       if (dbUser.email) token.email = dbUser.email;
 
       const needsRoleRefresh = !token.roles || trigger === "update" || !!user;
