@@ -4,6 +4,294 @@ Architectural and implementation decisions for the Claude Code Starter. Newest f
 
 ---
 
+## DECISION-027: Maintenance cron route is a sibling to the operational cron route; `vercel.json` carries both schedules
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-token-gc`
+
+### Decision
+
+Background maintenance tasks (token GC, data pruning, housekeeping sweeps) live in a dedicated `/api/cron/maintenance` route handler (`src/app/api/cron/maintenance/route.ts`), separate from operationally-critical background workers. The existing `/api/cron/email-queue` route's contract — "process pending outbound email" — is not extended with unrelated tasks.
+
+Both routes share the `CRON_SECRET` environment variable for authentication. Both schedules live in `vercel.json` under `"crons"`. Schedules are independent: email-queue runs every 5 minutes; maintenance runs daily at 03:00 UTC (`"0 3 * * *"`).
+
+### Rationale
+
+1. **Separation of operational vs. maintenance concerns.** `/api/cron/email-queue` is an operational worker — a failure there delays email delivery for real users. `/api/cron/maintenance` is a housekeeping sweep — a failure there leaves stale rows in the database but does not affect user-facing flows. Coupling them forces maintenance failures to appear as email-queue failures (or vice versa) in logs, making incident triage harder.
+
+2. **Independent schedules.** Email delivery requires a 5-minute cadence; token GC needs daily cadence at most. Running GC every 5 minutes is wasteful; running email processing once daily is dangerous. Separate routes allow independent scheduling without a branching dispatch table inside a single handler.
+
+3. **Extensibility.** A dedicated `/api/cron/maintenance` route is the natural home for future maintenance tasks (email queue row pruning, audit_events archiving, etc.) that forks will add. A single handler with a clear "maintenance" contract is easier to extend than a mixed-concern email handler.
+
+4. **Teaching artifact clarity.** A fork developer reading the project's cron configuration should immediately understand that there are two kinds of background work: operational (email-queue) and maintenance. Two named routes make this distinction obvious without reading the handler bodies.
+
+### `vercel.json` shape (approved)
+
+```json
+{
+  "crons": [
+    { "path": "/api/cron/email-queue", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/maintenance", "schedule": "0 3 * * *" }
+  ]
+}
+```
+
+### Convention going forward
+
+- New operational cron workers (e.g., a Stripe webhook reprocessor) get their own `/api/cron/<feature>` route with an appropriate schedule.
+- Additional maintenance tasks (row pruning, archiving) are added to `/api/cron/maintenance` as additional DELETE statements in the same handler, not as new cron routes.
+- `CRON_SECRET` is the single shared authentication mechanism for all cron routes. No new cron-specific env vars.
+
+### What is NOT changed
+
+- `/api/cron/email-queue` handler and schedule are unchanged.
+- `CRON_SECRET` semantics are unchanged.
+- No new npm dependencies.
+
+### Impact
+
+- Adds `src/app/api/cron/maintenance/route.ts`.
+- `vercel.json`: adds second cron entry for the maintenance route.
+
+---
+
+## DECISION-026: Fail-open requirement for auth-critical feature flags; named wrapper pattern in `src/lib/auth/`
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-auth-mode-flags`
+
+### Decision
+
+Feature flags that gate an authentication path (sign-in, credential validation) MUST use explicit fail-open handling at the check site. The standard `isFlagEnabled(key)` function is NOT safe to use directly for auth-critical flags because it returns `false` on a missing row or DB error — and `false` on a flag that means "allow this auth path" translates to "deny all sign-ins during a DB blip."
+
+**Required pattern for auth-critical flags:**
+
+```typescript
+// Named helper in src/lib/auth/ with explicit fail-open semantics
+export async function isLocalLoginEnabled(): Promise<boolean> {
+  try {
+    const row = await db.query.featureFlags.findFirst({
+      where: eq(featureFlags.key, "auth.local_login"),
+    });
+    // row undefined (flag not yet seeded) → treat as enabled (fail-open)
+    // row.enabled false → explicitly disabled by an admin
+    return row === undefined ? true : row.enabled;
+  } catch {
+    // DB unreachable → fail-open: never lock out credentials sign-in due to a DB blip
+    return true;
+  }
+}
+```
+
+The helper is named, unit-testable (same DI pattern as `src/lib/auth/lockout.ts`), and documents the fail-open rationale in its own body.
+
+### Classification rule
+
+A flag is "auth-critical" if its `false` value prevents an authentication path from completing AND the flag is expected to be `true` in the vast majority of deployments.
+
+`auth.local_login` meets both criteria. `auth.require_2fa` does NOT — its `false` value means "no forced 2FA," which is the safe and expected default; fail-closed on `false` is correct there.
+
+### Standard `isFlagEnabled()` semantics (unchanged)
+
+`isFlagEnabled(key)` returns `false` on a missing row. This is the correct default for feature-toggle flags (missing flag = feature is off). It must NOT be used for auth-blocking flags without a fail-open wrapper.
+
+### Convention going forward
+
+Any future flag whose `false` value blocks a sign-in or sign-up path must use an explicit fail-open wrapper, not `isFlagEnabled()` directly. The wrapper lives in `src/lib/auth/` and includes a `catch → true` block with a comment naming the blip-safety rationale.
+
+### What is NOT changed
+
+- `isFlagEnabled()` semantics are unchanged.
+- `auth.require_2fa` uses standard `isFlagEnabled()` — its fail-closed-on-missing behavior is correct.
+- No new npm dependencies.
+
+### Impact
+
+- Adds `src/lib/auth/local-login.ts` (or equivalent) with `isLocalLoginEnabled()` and a companion unit test.
+- `src/auth.ts` `authorize()`: replaces any direct `isFlagEnabled("auth.local_login")` call with `isLocalLoginEnabled()`.
+- `scripts/seed.ts`: registers `auth.local_login` with `enabled: true` and `auth.require_2fa` with `enabled: true`.
+
+---
+
+## DECISION-025: Per-account lockout state — two columns on `users`; logic in `src/lib/auth/lockout.ts`
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-account-lockout`
+
+Two architectural sub-decisions bundled because they answer the same question: where does lockout state and lockout logic live?
+
+### Sub-decision 1 — Schema: two columns on `users`, not a separate table
+
+`failedLoginAttempts` (integer, NOT NULL, default 0) and `lockedUntil` (timestamptz, nullable) are added directly to the `users` table in migration 0005.
+
+**Rationale:**
+
+1. `authorize()` already fetches the user row by email before any lockout check can fire. Adding two columns to that row eliminates a second roundtrip — no join, no separate fetch.
+2. The `users` table already holds auth-state columns in this neighborhood (`isActive`, `lastLoginAt`, `twoFactorRequired`). Lockout state is logically a property of the user's authentication posture, not a separate entity.
+3. A `user_lockout` separate table would force every lockout check through a join, complicating the `authorize()` read path with no benefit at the starter's scale.
+4. The npvitals reference (`src/lib/auth.ts:8-9`) confirms two columns on `users` are sufficient.
+
+**Index guidance:** No index on `failed_login_attempts` or `locked_until` is warranted. Both columns are accessed only on a row already retrieved by primary key.
+
+**Width tradeoff acknowledged:** The `users` table grows to 13 columns. Forks with very wide `users` tables and tight row-width budgets can extract to a `user_lockout` table; this decision documents the starter's default.
+
+### Sub-decision 2 — Logic: `src/lib/auth/lockout.ts`, DI'd pure helper
+
+The lockout evaluation logic is extracted to `src/lib/auth/lockout.ts` following the exact shape of `src/lib/auth/sign-in-gate.ts` (DECISION-015 precedent): pure functions, injected dependencies, no direct `db` import inside the module. Actual DB writes stay in `authorize()` where `db` is in scope.
+
+The helper exports:
+- `checkLockout(user: { failedLoginAttempts: number; lockedUntil: Date | null }, now: Date): { locked: boolean; resetCounter: boolean }` — pure, synchronous. `resetCounter: true` when the lock window has expired (signals `authorize()` to reset the counter before bcrypt, giving the user a fresh window rather than immediately re-locking on next failure).
+- `LOCKOUT_THRESHOLD = 5` — failure count that triggers a lock.
+- `LOCKOUT_DURATION_SECONDS = 900` — fifteen minutes.
+
+**Convention going forward:** Any future auth-adjacent guard logic that requires unit-testable evaluation without a real database follows the same DI'd pure-function pattern in `src/lib/auth/`. Helper evaluates state; caller handles persistence.
+
+### What is NOT changed
+
+- No new npm dependencies.
+- No `src/proxy.ts` changes (lockout runs in Node runtime `authorize()`, not at the Edge).
+- No admin UI for lockout state (out of scope for this iteration; tracked in `docs/TODO.md`).
+- OAuth sign-ins are unaffected — `authorize()` is credentials-only; `evaluateSignIn()` is unchanged.
+
+### Impact
+
+- `src/lib/db/schema.ts`: add `failedLoginAttempts` and `lockedUntil` to `users`.
+- `drizzle/0005_*.sql`: generated via `npm run db:generate`.
+- Adds `src/lib/auth/lockout.ts` with `checkLockout()`, `LOCKOUT_THRESHOLD`, `LOCKOUT_DURATION_SECONDS`.
+- Adds `src/lib/auth/lockout.test.ts` with unit tests (pure logic, no DB mock needed).
+- `src/auth.ts` `authorize()`: insert lockout check + conditional-increment UPDATE + success-path reset.
+- `src/lib/audit.ts` `AUDIT_ACTIONS`: add `USER_ACCOUNT_LOCKED: "user.account_locked"`.
+- `src/app/(password-reset)/reset-password/` action: reset both lockout columns in the password-update batch.
+
+---
+
+## DECISION-024: Report-only CSP posture — starter ships `Content-Security-Policy-Report-Only`; enforced CSP deferred to forks
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-security-headers`
+
+### Decision
+
+The starter ships `Content-Security-Policy-Report-Only` — not an enforced `Content-Security-Policy`. An enforced CSP is explicitly deferred to forks as a follow-on hardening step.
+
+### Rationale
+
+1. **Static `next.config.ts` headers cannot generate nonces.** Enforced CSP with `'unsafe-inline'` in `script-src` or `style-src` provides minimal protection — an attacker who can inject a `<script>` tag can inject inline JS that the `'unsafe-inline'` directive permits. Real CSP security requires nonce-based or hash-based `script-src` that removes `'unsafe-inline'`. Nonce generation requires per-request middleware (the nonce must be injected into both the HTTP header and the `<script>` tag in the same request). That is out of scope for a `next.config.ts` static-header approach. Shipping an enforced `'unsafe-inline'` CSP would give the false impression of protection.
+
+2. **Report-only is safe to start loose.** Violations surface in devtools and any connected `report-uri` endpoint without breaking the app. This gives fork developers visibility into what a tighter policy would catch before they commit to enforcement.
+
+3. **The starter is a fork baseline, not a production app.** A CSP that is enforced prematurely and breaks a fork's first third-party integration is a worse outcome than a report-only posture that forks can gradually tighten.
+
+### Fork-tightening path (to be documented in code comment)
+
+1. Deploy report-only. Observe violations for several days in devtools or a `report-uri` aggregation endpoint (add `/api/csp-report` + a route handler).
+2. Narrow directives based on observed violations. For any new external script or font, add the domain rather than keeping `'unsafe-inline'`.
+3. Add nonce generation in `src/proxy.ts` (or a custom Next.js `middleware.ts`) and pass the nonce to `<Script>` components. Remove `'unsafe-inline'` from `script-src`.
+4. Rename the header key from `Content-Security-Policy-Report-Only` to `Content-Security-Policy`.
+
+### Convention going forward
+
+`Content-Security-Policy-Report-Only` is the sanctioned CSP header key in this starter. No enforced `Content-Security-Policy` header is shipped. Any PR that adds an enforced CSP must go through the full pipeline with a Phase 2 ruling on nonce strategy.
+
+### Directive set (approved for initial implementation)
+
+```
+default-src 'self'
+script-src 'self' 'unsafe-inline'
+style-src 'self' 'unsafe-inline'
+img-src 'self' data: https://lh3.googleusercontent.com
+font-src 'self'
+connect-src 'self'
+frame-src 'none'
+frame-ancestors 'none'
+base-uri 'self'
+form-action 'self'
+```
+
+### What is NOT changed
+
+- No new npm dependencies.
+- `next.config.ts` is the only file touched.
+- No runtime code; headers are static strings.
+
+### Impact
+
+- `next.config.ts`: adds `Content-Security-Policy-Report-Only` to `securityHeaders`; drops `preload` from `Strict-Transport-Security`; adds `allowedDevOrigins: ["*.trycloudflare.com"]` to `nextConfig`.
+- A comment in `next.config.ts` at the CSP entry documents the fork-tightening path.
+- A comment at `Strict-Transport-Security` explains why `preload` is intentionally omitted.
+- A comment at `allowedDevOrigins` identifies it as a dev tunnel accommodation; fork owners who do not use Cloudflare tunnels may remove it.
+
+---
+
+## DECISION-023: TZ posture (write-local / read-UTC) and APP_VERSION (JSON import at build time)
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-feedback-dev-loop`
+
+Two implementation decisions bundled because they both answer "what does the client send to the server?" for the feedback form.
+
+### Sub-decision 1 — TZ posture: write-local / read-UTC (option b)
+
+The `feedbackPromptState` table stores `lastSnoozedDate` and `lastSubmittedDate` as `'YYYY-MM-DD'` text in the member's **local** timezone, derived from a client-provided `tzOffsetMinutes` field. The server-side `shouldShowFeedbackPrompt` check reads UTC "today" (`new Date().toISOString().slice(0, 10)`) to determine whether to suppress the prompt card.
+
+This creates a known asymmetry: a member in UTC-8 who submits at 11 PM local time (7 AM next UTC day) will write `lastSubmittedDate = "YYYY-MM-DD"` (their local date), but the next server render will compare against UTC "today" — which may already be the following day. In practice this means the suppression could fail to trigger for a narrow midnight window. This is acceptable for a template — the alternative (option c, a `timezone` IANA column on `users`) requires schema work and a UI to set it, which is out of scope.
+
+**Implementation rule:** `computeLocalDate(tzOffsetMinutes: number | null | undefined): string` is a private helper in `src/app/(member)/feedback/actions.ts`. It clamps `tzOffsetMinutes` to `[-720, +840]` (the full valid IANA range) and falls back to 0 (UTC) when the value is `null` or `undefined`. This handles the `429ed48` null-narrowing case from the huddleup reference.
+
+```typescript
+function computeLocalDate(tzOffsetMinutes: number | null | undefined): string {
+  const offset = typeof tzOffsetMinutes === "number"
+    ? Math.max(-720, Math.min(840, tzOffsetMinutes))
+    : 0;
+  const localMs = Date.now() - offset * 60_000;
+  return new Date(localMs).toISOString().slice(0, 10);
+}
+```
+
+The `tzOffsetMinutes` value is captured from `new Date().getTimezoneOffset()` at submit/snooze time (in the client component) and passed as part of the action payload. It is clamped server-side regardless of what the client sends.
+
+**CLAUDE.md note:** the "Feedback and Dev-Loop Wiring" invariant subsection documents this asymmetry explicitly so fork developers understand it is intentional, not a bug.
+
+### Sub-decision 2 — APP_VERSION: JSON import at build time via `src/lib/version.ts`
+
+The feedback form's bug-category context block displays the current app version. The starter does not have a version utility. Options considered:
+
+1. `next.config.ts` build env (`env: { NEXT_PUBLIC_APP_VERSION: process.env.npm_package_version }`) — requires touching `next.config.ts` and adds a `NEXT_PUBLIC_` env that shows in the client bundle explicitly.
+2. `import pkg from "../../package.json"` in a `src/lib/version.ts` module — `resolveJsonModule: true` is already in `tsconfig.json`; the import is resolved at compile time; the version string is a build-time constant included in the client bundle.
+3. Drop appVersion from v1 — loses useful bug context.
+
+**Decision: option 2** — `src/lib/version.ts` with a plain JSON module import.
+
+```typescript
+// src/lib/version.ts
+// Build-time constant — resolved from package.json at compile time.
+// No 'server-only' marker: FeedbackForm is a 'use client' component that imports this.
+// The version string is not sensitive and safe in the client bundle.
+import pkg from "../../package.json";
+export const APP_VERSION: string = pkg.version;
+```
+
+The relative path from `src/lib/version.ts` to the project root is `../../package.json`. This resolves correctly. No new dependencies; no `next.config.ts` change. The string is baked in at build time — a rebuild is required for version changes (which is already required for any code change).
+
+### What is NOT changed
+
+- No new npm dependencies.
+- No `next.config.ts` changes.
+- No user-visible schema column for timezone (IANA string column deferred).
+
+### Impact
+
+- Adds `src/lib/version.ts`.
+- `src/app/(member)/feedback/actions.ts`: contains `computeLocalDate` helper; `tzOffsetMinutes` is an optional nullable field in `submitFeedback` and `snoozeFeedbackPrompt` inputs.
+- CLAUDE.md: "Feedback and Dev-Loop Wiring" Key Invariants subsection documents the UTC-read / local-write asymmetry.
+
+---
+
 ## DECISION-022: SessionStart hook convention — `.mjs` with `@neondatabase/serverless`; registered in `.claude/settings.json`; prompt-injection boundary is count-only output
 
 **Status:** Resolved
