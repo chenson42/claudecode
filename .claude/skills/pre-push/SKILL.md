@@ -70,7 +70,23 @@ npm run check:audit
 
 **Do not proceed if the audit-coverage check fails.**
 
-## Step 3c: Unit Tests
+## Step 3c: sql<Date> Tripwire
+
+```bash
+npm run check:sql-date
+```
+
+`scripts/check-sql-date.mjs` walks every `.ts` and `.tsx` under `src/` and fails
+if it finds `sql<Date` without an annotation. The Neon serverless driver returns
+timestamps from computed expressions (COALESCE, date_trunc, etc.) as strings at
+runtime — `sql<Date>` is a compile-time lie that TypeScript cannot detect. Fix by:
+selecting real column(s) and converting in JS, using `.mapWith(Date)`, or annotating
+with `// sql-date-ok: <reason>` when the expression is used only in WHERE/ORDER and
+is never selected/returned to JS.
+
+**Do not proceed if the sql-date check fails.**
+
+## Step 3d: Unit Tests
 
 ```bash
 npm test
