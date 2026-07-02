@@ -23,6 +23,8 @@ detail lives in the linked doc, not here.
 
 ## Backlog
 
+- [ ] Stale test replica: (auth)/totp/actions.test.ts tests a local copy of the pre-extraction sanitizeCallbackUrl (old /admin fallback) — retire or point at safe-callback.test.ts coverage
+
 - [ ] Admin lock-state detail page — add lock badge + unlock action to `/admin/users/[id]` — follow-up from `docs/work-log/2026-07-02-admin-lock-visibility.md` Phase 3 scope decision
 - [ ] `(password-reset)` error boundary — same gap as `(email-verify)`; unauthenticated token-lookup route, no error.tsx — tracked from `docs/work-log/2026-07-02-email-verify-error-boundary.md` Phase 1 Pass 5
 - [ ] Tier 4 utilities on demand (csvCellSafe, ssrf-guard, magic-bytes, maskEmail, settings store, ConfirmDialog, iconKey nav, cf-connecting-ip, route-table 2FA gate, …) — harvest Tier 4
