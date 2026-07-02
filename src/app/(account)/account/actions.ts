@@ -2,7 +2,7 @@
 
 import { randomBytes, createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, gt } from "drizzle-orm";
 import { compare, hash } from "bcryptjs";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -111,6 +111,7 @@ export async function requestEmailChange(input: {
     where: and(
       eq(emailVerificationTokens.newEmail, newEmail),
       ne(emailVerificationTokens.userId, session.user.id),
+      gt(emailVerificationTokens.expiresAt, new Date()),
     ),
     columns: { id: true },
   });

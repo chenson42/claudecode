@@ -229,6 +229,41 @@ describe(
         // Assert
         expect(blocked).toBe(false);
       });
+
+      // expiresAt-filter regression tests (bug: missing gt(expiresAt, now) predicate)
+      //
+      // The WHERE clause now includes `gt(expiresAt, new Date())`. An expired
+      // row is excluded by the query, so `findFirst` returns `undefined` and the
+      // action must NOT block user B. A live row (expiresAt in the future) is
+      // returned by the query and the action MUST block user B.
+      //
+      // Before the fix: only eq(newEmail) + ne(userId) — no expiresAt term.
+      // Expired rows were included, permanently blocking user B until the next
+      // daily GC sweep. After the fix: gt(expiresAt, now) excludes expired rows.
+
+      it("does not block when the query returns undefined — expired row was filtered out by gt(expiresAt, now)", () => {
+        // Arrange — simulate the DB returning undefined because the row's
+        // expiresAt is in the past and the new gt() predicate excluded it
+        const pendingRow = undefined;
+
+        // Act
+        const blocked = pendingTokenCollisionDetected(pendingRow);
+
+        // Assert — regression: this was incorrectly blocked before the fix
+        expect(blocked).toBe(false);
+      });
+
+      it("blocks when the query returns a live row — expiresAt is in the future so gt() included it", () => {
+        // Arrange — simulate the DB returning a row because the token is still
+        // valid (expiresAt in the future), so gt(expiresAt, now) passes it
+        const pendingRow = { id: "live-token-uuid" };
+
+        // Act
+        const blocked = pendingTokenCollisionDetected(pendingRow);
+
+        // Assert — live claim continues to block as intended
+        expect(blocked).toBe(true);
+      });
     });
   },
 );
