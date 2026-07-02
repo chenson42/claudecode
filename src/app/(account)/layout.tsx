@@ -21,8 +21,8 @@ export default async function AccountLayout({
   ];
 
   return (
-    <div className="grid min-h-screen grid-cols-[220px_1fr]">
-      <aside className="border-r border-border bg-muted/40 p-4">
+    <div className="grid min-h-screen grid-cols-1 md:grid-cols-[220px_1fr]">
+      <aside className="border-b border-border bg-muted/40 p-4 md:border-b-0 md:border-r">
         <div className="mb-6">
           <Link href="/home" className="text-sm font-semibold">
             ← Home

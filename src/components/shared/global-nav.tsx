@@ -14,7 +14,7 @@ export function GlobalNav({ session }: { session: Session }) {
 
   return (
     <header className="border-b border-border bg-background">
-      <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-3">
+      <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3 sm:px-6">
         <Link href="/" className="text-sm font-semibold">
           Claude Code Starter
         </Link>
