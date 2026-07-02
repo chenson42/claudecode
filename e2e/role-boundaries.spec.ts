@@ -43,16 +43,18 @@ test("unauthenticated visit to /home redirects to /signin with callbackUrl", asy
   expect(url.searchParams.get("callbackUrl")).toBe("/home");
 });
 
-// Test 2 — Member: /admin is blocked → /access-pending
+// Test 2 — Member: /admin is blocked → /access-pending?from=%2Fadmin
 test.describe("Member — /admin blocked", () => {
   test.use({ storageState: storageStatePath("member") });
 
-  test("member navigating to /admin is redirected to /access-pending", async ({
+  test("member navigating to /admin is redirected to /access-pending with from param", async ({
     page,
   }) => {
     test.skip(!HAVE_MEMBER, "SEED_MEMBER_EMAIL/PASSWORD not set");
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/access-pending/);
+    const url = new URL(page.url());
+    expect(url.searchParams.get("from")).toBe("/admin");
   });
 });
 
@@ -83,5 +85,21 @@ test.describe("Admin — positive gate", () => {
     test.skip(!HAVE_ADMIN, "SEED_ADMIN_EMAIL/PASSWORD not set");
     await page.goto("/admin");
     expect(page.url()).toMatch(/\/admin/);
+  });
+});
+
+// Test 5 — Member: /admin/feedback is blocked by proxy → /access-pending
+test.describe("Feedback admin gate — member cannot access /admin/feedback", () => {
+  test.use({ storageState: storageStatePath("member") });
+
+  test("member navigating to /admin/feedback is redirected to /access-pending", async ({
+    page,
+  }) => {
+    test.skip(!HAVE_MEMBER, "SEED_MEMBER_EMAIL/PASSWORD not set");
+    await page.goto("/admin/feedback");
+    // proxy.ts gates all /admin/* routes behind admin.dashboard; members
+    // without that feature are sent to /access-pending before the page-level
+    // check ever runs.
+    await expect(page).toHaveURL(/\/access-pending/);
   });
 });

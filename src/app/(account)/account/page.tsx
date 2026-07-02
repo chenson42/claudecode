@@ -3,19 +3,21 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { users, userTotp, emailVerificationTokens } from "@/lib/db/schema";
+import { users, userTotp, emailVerificationTokens, feedbackPromptState } from "@/lib/db/schema";
 import { ProfileForm } from "./profile-form";
 import { EmailForm } from "./email-form";
 import { PasswordForm } from "./password-form";
 import { DeleteAccountButton } from "./delete-button";
 import { TwoFactorStatusPill } from "./2fa-status";
 import { SearchParamToast } from "./search-param-toast";
+import { FeedbackForm } from "@/components/shared/feedback-form";
+import { FeedbackOptOutToggle } from "./feedback-opt-out-toggle";
 
 export default async function AccountPage() {
   const session = await auth();
   if (!session?.user) redirect("/signin?callbackUrl=/account");
 
-  const [userRow, totp, pendingToken] = await Promise.all([
+  const [userRow, totp, pendingToken, promptState] = await Promise.all([
     db.query.users.findFirst({
       where: eq(users.id, session.user.id),
       columns: { name: true, email: true, password: true },
@@ -27,6 +29,10 @@ export default async function AccountPage() {
     db.query.emailVerificationTokens.findFirst({
       where: eq(emailVerificationTokens.userId, session.user.id),
       columns: { newEmail: true },
+    }),
+    db.query.feedbackPromptState.findFirst({
+      where: eq(feedbackPromptState.userId, session.user.id),
+      columns: { optedOut: true },
     }),
   ]);
 
@@ -85,7 +91,19 @@ export default async function AccountPage() {
         <TwoFactorStatusPill isEnrolled={isEnrolled} />
       </section>
 
-      {/* Card 5 — Delete Account */}
+      {/* Card 5 — Send feedback */}
+      <section className="rounded-lg border border-border p-6">
+        <h2 className="text-base font-medium">Send feedback</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Have a suggestion or spotted a bug? We read every submission.
+        </p>
+        <FeedbackForm />
+        <div className="mt-4">
+          <FeedbackOptOutToggle optedOut={promptState?.optedOut ?? false} />
+        </div>
+      </section>
+
+      {/* Card 6 — Delete Account */}
       <section className="rounded-lg border border-red-500/20 p-6">
         <h2 className="text-base font-medium text-red-600">Danger zone</h2>
         <p className="mt-1 text-sm text-muted-foreground">

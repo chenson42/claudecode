@@ -17,8 +17,14 @@ detail lives in the linked doc, not here.
 ## In Flight
 
 - [ ] `/test` + `/test-results` skills port — in progress (doc-only)
-- [ ] In-app feedback + dev-loop triage wiring — Phase 2 complete (Approved with suggestions), Phase 3 next (tech-lead) — `docs/work-log/2026-07-01-feedback-dev-loop.md`
 - [ ] Push `feat/post-login-routing-and-e2e` (2 commits ready, awaiting `/pre-push` + user push) and open the PR
+- [ ] Per-account login lockout — Phase 3 complete (design done), advancing to api-developer Phase 4 — `docs/work-log/2026-07-01-account-lockout.md`
+- [ ] Report-only CSP + HSTS preload removal — Phase 4 complete, advancing to qa (Phase 5) — `docs/work-log/2026-07-01-security-headers.md`
+- [ ] ACCESS_DENIED audit event on /access-pending bounce — Phase 4 complete (30/30 e2e), advancing to qa (Phase 5) — `docs/work-log/2026-07-01-access-denied-audit.md`
+- [ ] `check:sql-date` tripwire — Phase 1 complete (READY WITH NOTES), advancing to architect Phase 2 — `docs/work-log/2026-07-01-sql-date-tripwire.md`
+- [ ] `cache()`-wrap `isFlagEnabled` + (pending empirical check) `cachedAuth` — Phase 1 complete (READY WITH NOTES) — `docs/work-log/2026-07-01-flag-caching.md`
+- [ ] Opportunistic expired-token GC — Phase 1 complete (READY WITH NOTES), advancing to architect Phase 2 — `docs/work-log/2026-07-01-token-gc.md`
+- [ ] `auth.local_login` + `auth.require_2fa` admin flags — Phase 1 complete (READY WITH NOTES), advancing to architect Phase 2 — `docs/work-log/2026-07-01-auth-mode-flags.md`
 
 ## Next Up
 
@@ -26,21 +32,16 @@ detail lives in the linked doc, not here.
 
 ## Backlog
 
-- [ ] Per-account login lockout (`failedLoginAttempts` + `lockedUntil`) — harvest Tier 2 #8
-- [ ] `cache()`-wrap `isFlagEnabled`; audit duplicate `auth()` stale-check queries — harvest Tier 2 #10
-- [ ] Report-only CSP headers; drop HSTS `preload` — harvest Tier 2 #11
 - [ ] Turnstile CAPTCHA component (no-op until keyed) for `/signin` + `/forgot-password` — harvest Tier 2 #12
-- [ ] `auth.local_login` + `auth.require_2fa` admin flags — harvest Tier 2 #13
-- [ ] `check:sql-date` tripwire — harvest Tier 2 #14
-- [ ] Opportunistic expired-token GC (reset + email-verification tokens) — harvest Tier 2 #15
 - [ ] Audit log viewer under /admin/audit — display ip, user_agent, actorEmail, metadata per row; filter by action and date range — follow-up, record-audit-helper work-log
-- [ ] `ACCESS_DENIED`/`ACCESS_GRANTED` audit events on the access-pending bounce — harvest Tier 3 #23 (code half; instruction half shipped)
 - [ ] Tier 4 utilities on demand (csvCellSafe, ssrf-guard, magic-bytes, maskEmail, settings store, ConfirmDialog, iconKey nav, cf-connecting-ip, route-table 2FA gate, …) — harvest Tier 4
 - [ ] `(email-verify)` route group has no `error.tsx` — non-23505 throws in `verify-email/[token]/page.tsx` surface as a raw 500 — follow-up from `isUniqueViolation()` Phase 2 — `docs/work-log/2026-07-01-unique-violation-helper.md`
 - [ ] Admin queue viewer under /admin/email-queue — display status, recipient, subject, attempt count, last error per row; filter by status and date range. Needs `admin.email_queue` permission when built — follow-up, email-queue work-log
 - [ ] Resend delivery webhook (Svix-verified webhook to update email_queue row status from `sent` to `delivered` or `bounced`) — harvest Tier 2 #7 optional pair, email-queue work-log
 - [ ] Member-visible what's-new / changelog — V2 loop-closure: surface delivered feedback-sourced features to members (requires a member-facing surface for release notes, currently admin-only); tracked as follow-up from feedback-dev-loop pipeline — `docs/work-log/2026-07-01-feedback-dev-loop.md`
 - [ ] TOTP enrolment e2e — requires either a seeded deterministic TOTP secret (security risk — see routing feature option (c) rationale, e2e-auth-infra work-log Phase 2 Ruling 7) or external authenticator integration; deferred until a safe pattern is designed
+- [ ] Admin lock-state visibility in /admin/users — show `lockedUntil` per user row; add manual unlock action — follow-up, account-lockout Phase 2 ruling R8
+- [ ] E2E test-data hygiene for feedback: rows submitted during e2e runs persist in the dev DB with status='new', causing the SessionStart hook to fire a banner for test artifacts on every session; add afterAll cleanup in `e2e/feedback.spec.ts` or truncate in `e2e/support/global-setup.ts` — Phase 6 follow-up, feedback-dev-loop work-log
 
 ## Done
 
@@ -55,3 +56,4 @@ detail lives in the linked doc, not here.
 - [x] 2026-07-01 — isUniqueViolation() helper (verify-email ErrorCard, password-reset atomic upsert) — SHIP IT — `docs/work-log/2026-07-01-unique-violation-helper.md`
 - [x] 2026-07-01 — E2E auth infra (cached storageState, role boundaries, DB isolation guard) — SHIP IT — `docs/work-log/2026-07-01-e2e-auth-infra.md`
 - [x] 2026-07-01 — Durable email queue with retry (persist-first enqueue, cron worker, vercel.json) — SHIP IT — `docs/work-log/2026-07-01-email-queue.md`
+- [x] 2026-07-01 — In-app feedback + dev-loop triage wiring — SHIP WITH NOTES (FU-1: e2e test-data hygiene) — `docs/work-log/2026-07-01-feedback-dev-loop.md`

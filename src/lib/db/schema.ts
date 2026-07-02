@@ -332,6 +332,64 @@ export const emailQueue = pgTable(
   ],
 );
 
+// Member feedback submissions. Append-only; status progresses forward only.
+// Status lifecycle: new → triaged → done (delivered)
+//                  new → declined (won't do)
+//                  triaged → declined (decided against after review)
+// Terminal states (done, declined) never regress — enforced in updateFeedbackStatus action.
+// FK to users only — no joins to roles, sessions, or any other application table
+// (privacy invariant: the admin triage page shows member display name only, not email).
+export const feedback = pgTable(
+  "feedback",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // 'suggestion' | 'bug' | 'other' | null (member didn't choose).
+    // Text, not pgEnum — consistent with project convention (see emailQueue.status).
+    category: text("category"),
+    // Member-supplied text. Trimmed; length enforced server-side (1–2000 chars).
+    body: text("body").notNull(),
+    // Bug-only metadata. Null when category !== 'bug'.
+    contextPath: text("context_path"), // max 512 chars, page URL at submit time
+    appVersion: text("app_version"), // max 32 chars, from src/lib/version.ts
+    // 'new' | 'triaged' | 'done' | 'declined' — text, not pgEnum.
+    status: text("status").notNull().default("new"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // Serves the admin page (ORDER BY created_at DESC with status filter) and
+    // the SessionStart hook (WHERE status = 'new' count). One index covers both.
+    index("ix_feedback_status_created").on(t.status, t.createdAt),
+    // Per-user history and rate-limit context lookups.
+    index("ix_feedback_user").on(t.userId),
+  ],
+);
+
+// Per-user daily prompt suppression state. One row per user (userId is PK).
+//
+// CLOBBER-PREVENTION INVARIANT: each upsert operation (submit, snooze, opt-out)
+// sets ONLY its own column in onConflictDoUpdate.set. The other two columns
+// retain their existing values. Never touch more than one field per upsert.
+//
+// Date fields are 'YYYY-MM-DD' text in the member's LOCAL timezone, derived from
+// client-provided tzOffsetMinutes at write time. The server reads UTC 'today' for
+// the shouldShow suppression check — this is a known imprecision (DECISION-023).
+export const feedbackPromptState = pgTable("feedback_prompt_state", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // true = member permanently dismissed the daily prompt.
+  optedOut: boolean("opted_out").notNull().default(false),
+  // Last date member clicked "Not today". Compared with UTC today for suppression.
+  lastSnoozedDate: text("last_snoozed_date"),
+  // Last date member submitted feedback. Compared with UTC today for suppression.
+  lastSubmittedDate: text("last_submitted_date"),
+});
+
 // Relations
 
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -344,6 +402,11 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   }),
   emailVerificationTokens: many(emailVerificationTokens),
   passwordResetTokens: many(passwordResetTokens),
+  feedback: many(feedback),
+  feedbackPromptState: one(feedbackPromptState, {
+    fields: [users.id],
+    references: [feedbackPromptState.userId],
+  }),
 }));
 
 export const rolesRelations = relations(roles, ({ many }) => ({
@@ -379,6 +442,20 @@ export const passwordResetTokensRelations = relations(
   ({ one }) => ({
     user: one(users, {
       fields: [passwordResetTokens.userId],
+      references: [users.id],
+    }),
+  }),
+);
+
+export const feedbackRelations = relations(feedback, ({ one }) => ({
+  user: one(users, { fields: [feedback.userId], references: [users.id] }),
+}));
+
+export const feedbackPromptStateRelations = relations(
+  feedbackPromptState,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [feedbackPromptState.userId],
       references: [users.id],
     }),
   }),

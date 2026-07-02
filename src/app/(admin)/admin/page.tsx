@@ -28,6 +28,11 @@ export default async function AdminDashboard() {
       blurb: "What shipped, when.",
     },
     {
+      href: "/admin/feedback",
+      title: "Feedback",
+      blurb: "Review member suggestions and bug reports.",
+    },
+    {
       href: "/admin/2fa",
       title: "Your 2FA",
       blurb: "Enroll or rotate your authenticator.",

@@ -1,6 +1,10 @@
 // Public API for @/lib/email. All existing import { ... } from "@/lib/email"
 // call sites continue to resolve through this barrel without path changes.
 
+// HTML escaping for member-supplied strings interpolated into email bodies.
+// Must be applied to all user-controlled content before HTML interpolation (XSS guard).
+export { escapeHtml } from "./escape-html";
+
 // enqueueEmail is the canonical entry point for all outbound email.
 // Do NOT call sendEmail() directly from server actions or pages — see DECISION-018.
 export { enqueueEmail } from "./queue";

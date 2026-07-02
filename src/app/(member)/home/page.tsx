@@ -1,6 +1,27 @@
 import Link from "next/link";
+import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { feedbackPromptState } from "@/lib/db/schema";
 import { FEATURES } from "@/lib/permissions";
+import { FeedbackPromptCard } from "./feedback-prompt-card";
+
+// Server-side computation: should the daily feedback prompt card be shown?
+// Uses UTC "today" for the comparison (known write-local/read-UTC imprecision — see DECISION-023).
+function shouldShowFeedbackPrompt(
+  state: {
+    optedOut: boolean;
+    lastSnoozedDate: string | null;
+    lastSubmittedDate: string | null;
+  } | null,
+): boolean {
+  if (!state) return true; // New user — no row yet. Show the card.
+  if (state.optedOut) return false;
+  const today = new Date().toISOString().slice(0, 10); // UTC 'YYYY-MM-DD'
+  if (state.lastSnoozedDate === today) return false;
+  if (state.lastSubmittedDate === today) return false;
+  return true;
+}
 
 // auth() is memoized via React cache() — calling it here after the layout
 // already called it costs nothing (same request, same cached result).
@@ -12,6 +33,13 @@ export default async function HomePage() {
   const roles = user.roles ?? [];
   const featuresList = user.features ?? [];
   const isAdmin = featuresList.includes(FEATURES.ADMIN_DASHBOARD);
+
+  // Feedback prompt state — query even for no-role users (their signal is valuable).
+  const promptState = await db.query.feedbackPromptState.findFirst({
+    where: eq(feedbackPromptState.userId, user.id),
+    columns: { optedOut: true, lastSnoozedDate: true, lastSubmittedDate: true },
+  });
+  const showFeedbackPrompt = shouldShowFeedbackPrompt(promptState ?? null);
 
   return (
     <>
@@ -75,6 +103,13 @@ export default async function HomePage() {
           )}
         </div>
       </section>
+
+      {/* Daily feedback prompt card — suppressed after snooze/submit/opt-out for today */}
+      {showFeedbackPrompt && (
+        <section className="mt-8">
+          <FeedbackPromptCard />
+        </section>
+      )}
     </>
   );
 }

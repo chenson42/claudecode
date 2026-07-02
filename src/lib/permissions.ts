@@ -11,6 +11,7 @@ export const FEATURES = {
   ADMIN_USERS: "admin.users",
   ADMIN_FLAGS: "admin.flags",
   ADMIN_RELEASE_NOTES: "admin.release_notes",
+  ADMIN_FEEDBACK: "admin.feedback",
 } as const;
 
 export type FeatureKey = (typeof FEATURES)[keyof typeof FEATURES];
@@ -43,6 +44,12 @@ export const FEATURE_CATALOG: Array<{
     key: FEATURES.ADMIN_RELEASE_NOTES,
     name: "Read release notes",
     description: "View release notes from the admin docs page.",
+    category: "admin",
+  },
+  {
+    key: FEATURES.ADMIN_FEEDBACK,
+    name: "Manage feedback",
+    description: "View and triage member feedback submissions at /admin/feedback.",
     category: "admin",
   },
 ];
