@@ -269,6 +269,69 @@ export const passwordResetTokens = pgTable(
   ],
 );
 
+// Email queue — persist-first outbound email with exponential-backoff retry.
+// Rendered HTML (including token URLs) is stored at rest; see DECISION-018
+// Sub-decision 2 for the privacy tradeoff and fork accommodation note.
+// Single-recipient only: insert one row per recipient for multi-recipient needs.
+
+export const emailQueue = pgTable(
+  "email_queue",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    // Intended recipient. Always the real address even when EMAIL_DEV_REDIRECT_TO
+    // overrides the live send. Stored for monitoring and permanent-fail auditing.
+    toEmail: text("to_email").notNull(),
+    // Nullable; if null, the send step defaults to RESEND_FROM_EMAIL at send time.
+    // Storing it ensures retries use the same from address as the initial attempt.
+    fromEmail: text("from_email"),
+    replyTo: text("reply_to"),
+    subject: text("subject").notNull(),
+    // Fully rendered HTML including any token URLs. See DECISION-018.
+    htmlBody: text("html_body").notNull(),
+    textBody: text("text_body"),
+    // Label for the email type: 'password_reset' | 'email_change_verify'.
+    // Used for monitoring/filtering and permanent-fail audit events.
+    // NOT used to re-render at send time.
+    templateKey: text("template_key").notNull(),
+    // 'queued' | 'processing' | 'sent' | 'failed' — text per existing schema convention (no pgEnum).
+    status: text("status").notNull().default("queued"),
+    // Incremented on each attempt (inline or worker). Starts at 0.
+    attemptCount: integer("attempt_count").notNull().default(0),
+    // Default 8: inline attempt + up to 7 worker retries before permanent failure.
+    maxAttempts: integer("max_attempts").notNull().default(8),
+    // NULL on insert = eligible for immediate inline attempt.
+    // Set to backoff schedule (now + delay) after each failed worker attempt.
+    // After the inline attempt completes (success or failure), this is non-null.
+    // The worker NEVER sees a null nextAttemptAt row in practice because the
+    // inline path resolves before the first cron window (sub-second vs 5 minutes).
+    // The COALESCE in the claim SQL handles the null case defensively.
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    // Set to NOW() when the worker claims the row (via the CTE UPDATE).
+    // Also used for the lease-recovery query: rows in 'processing' with
+    // lastAttemptAt < now() - 10 minutes are considered stuck and re-queued.
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    // Set when status transitions to 'sent'.
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    // Resend message ID on successful send; 'dev-intercepted:<uuid>' in dev mode.
+    providerMessageId: text("provider_message_id"),
+    // Last error message from Resend on failure. Overwritten on each attempt.
+    failureReason: text("failure_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    // Primary worker query filter: WHERE status='queued' AND nextAttemptAt <= now()
+    index("ix_email_queue_status_next").on(t.status, t.nextAttemptAt),
+    // Lease-recovery query: WHERE status='processing' AND lastAttemptAt < now()-10min
+    index("ix_email_queue_status_last").on(t.status, t.lastAttemptAt),
+  ],
+);
+
 // Relations
 
 export const usersRelations = relations(users, ({ many, one }) => ({

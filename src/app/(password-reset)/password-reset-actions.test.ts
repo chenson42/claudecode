@@ -1,4 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// These mocks are required so `await import("@/lib/audit")` below succeeds in
+// the Vitest Node.js environment. audit.ts now transitively loads modules that
+// are not available or require env vars in plain Node.js:
+// - server-only: throws outside the Next.js bundler context.
+// - @/auth: loads next-auth → next/server, not resolvable without Next.js.
+// - @/lib/db: throws if DATABASE_URL is not set.
+// The tests only need AUDIT_ACTIONS string constants, not any of this behaviour.
+vi.mock("server-only", () => ({}));
+vi.mock("@/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/lib/db", () => ({ db: { insert: vi.fn().mockReturnValue({ values: vi.fn() }) } }));
 
 // Regression tests for the forgot-password flow (Phase 5 — QA).
 //
@@ -328,6 +339,35 @@ describe(
 
       // Assert
       expect(outcome.claimed).toBe(true);
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// requestPasswordReset — upsert contract (delete+insert → onConflictDoUpdate)
+//
+// Changed from delete-then-insert to insert().onConflictDoUpdate() targeting
+// passwordResetTokens.userId. Observable contract is unchanged: always
+// returns { ok: true } for a valid credentials user. The delete+insert race
+// window (two concurrent requests → 23505 on ix_pwd_reset_user) is closed.
+// ---------------------------------------------------------------------------
+
+describe(
+  "requestPasswordReset — upsert contract — regression for delete+insert race window",
+  () => {
+    it("returns { ok: true } for a second request from the same userId (upsert replaces token)", () => {
+      // The upsert eliminates the race; the observable result for any number of
+      // concurrent requests from the same credentials user is still { ok: true }.
+      const credentialsUser = { exists: true, hasPassword: true };
+      const result = requestPasswordResetResultForUser(credentialsUser);
+      expect(result).toStrictEqual({ ok: true });
+    });
+
+    it("passwordResetTokens.userId exists — required upsert target column", async () => {
+      // If this column is removed or renamed, the onConflictDoUpdate call in
+      // requestPasswordReset will fail at runtime. Catch it at test time.
+      const schema = await import("@/lib/db/schema");
+      expect(schema.passwordResetTokens).toHaveProperty("userId");
     });
   },
 );

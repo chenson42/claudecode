@@ -16,11 +16,8 @@ detail lives in the linked doc, not here.
 
 ## In Flight
 
-- [ ] Email queue with retry — Phase 1 (analyst) — `docs/work-log/2026-07-01-email-queue.md`
-- [ ] E2E auth infra (cached storageState, role boundaries, DB guard) — Phase 1 (analyst) — `docs/work-log/2026-07-01-e2e-auth-infra.md`
-- [ ] `isUniqueViolation()` helper — Phase 3 next (Phase 2 Approved) — `docs/work-log/2026-07-01-unique-violation-helper.md`
 - [ ] `/test` + `/test-results` skills port — in progress (doc-only)
-- [ ] `recordAudit()` helper (audit ip/user_agent) — Phase 4 next (Phase 3 design complete) — `docs/work-log/2026-07-01-record-audit-helper.md`
+- [ ] In-app feedback + dev-loop triage wiring — Phase 2 complete (Approved with suggestions), Phase 3 next (tech-lead) — `docs/work-log/2026-07-01-feedback-dev-loop.md`
 - [ ] Push `feat/post-login-routing-and-e2e` (2 commits ready, awaiting `/pre-push` + user push) and open the PR
 
 ## Next Up
@@ -40,6 +37,10 @@ detail lives in the linked doc, not here.
 - [ ] `ACCESS_DENIED`/`ACCESS_GRANTED` audit events on the access-pending bounce — harvest Tier 3 #23 (code half; instruction half shipped)
 - [ ] Tier 4 utilities on demand (csvCellSafe, ssrf-guard, magic-bytes, maskEmail, settings store, ConfirmDialog, iconKey nav, cf-connecting-ip, route-table 2FA gate, …) — harvest Tier 4
 - [ ] `(email-verify)` route group has no `error.tsx` — non-23505 throws in `verify-email/[token]/page.tsx` surface as a raw 500 — follow-up from `isUniqueViolation()` Phase 2 — `docs/work-log/2026-07-01-unique-violation-helper.md`
+- [ ] Admin queue viewer under /admin/email-queue — display status, recipient, subject, attempt count, last error per row; filter by status and date range. Needs `admin.email_queue` permission when built — follow-up, email-queue work-log
+- [ ] Resend delivery webhook (Svix-verified webhook to update email_queue row status from `sent` to `delivered` or `bounced`) — harvest Tier 2 #7 optional pair, email-queue work-log
+- [ ] Member-visible what's-new / changelog — V2 loop-closure: surface delivered feedback-sourced features to members (requires a member-facing surface for release notes, currently admin-only); tracked as follow-up from feedback-dev-loop pipeline — `docs/work-log/2026-07-01-feedback-dev-loop.md`
+- [ ] TOTP enrolment e2e — requires either a seeded deterministic TOTP secret (security risk — see routing feature option (c) rationale, e2e-auth-infra work-log Phase 2 Ruling 7) or external authenticator integration; deferred until a safe pattern is designed
 
 ## Done
 
@@ -50,3 +51,7 @@ detail lives in the linked doc, not here.
 - [x] 2026-07-01 — BUG-4: NextAuth `trustHost` unset — OAuth hard-blocked off-Vercel — SHIP IT — `docs/work-log/2026-07-01-nextauth-trusthost.md`
 - [x] 2026-07-01 — Post-login routing + member home + global nav + e2e hardening — SHIP IT, committed `18f04a7`
 - [x] 2026-07-01 — Sibling harvest of 7 fork repos → classified punch-list — committed `4c54e4f`
+- [x] 2026-07-01 — recordAudit() helper (audit ip/user_agent, request-ip.ts shared module, logAttempt elimination) — SHIP IT — `docs/work-log/2026-07-01-record-audit-helper.md`
+- [x] 2026-07-01 — isUniqueViolation() helper (verify-email ErrorCard, password-reset atomic upsert) — SHIP IT — `docs/work-log/2026-07-01-unique-violation-helper.md`
+- [x] 2026-07-01 — E2E auth infra (cached storageState, role boundaries, DB isolation guard) — SHIP IT — `docs/work-log/2026-07-01-e2e-auth-infra.md`
+- [x] 2026-07-01 — Durable email queue with retry (persist-first enqueue, cron worker, vercel.json) — SHIP IT — `docs/work-log/2026-07-01-email-queue.md`

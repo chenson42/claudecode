@@ -33,7 +33,7 @@ async function* walk(dir) {
 // Allow whitespace/newlines between `db`, `.`, and the verb — multi-line
 // fluent calls are common.
 const MUTATION_RE = /\bdb\s*\.\s*(insert|update|delete)\b/;
-const AUDIT_RE = /\bauditEvents\b/;
+const AUDIT_RE = /\bauditEvents\b|\brecordAudit\b/;
 const EXEMPT_RE = /\/\/\s*audit-exempt:/i;
 
 const failures = [];
@@ -57,7 +57,7 @@ for await (const file of walk(SRC)) {
     failures.push({
       file: path.relative(ROOT, file),
       reason:
-        "file contains DB mutations but no auditEvents insert. Add one or annotate with `// audit-exempt: <reason>` above the mutation.",
+        "file contains DB mutations but no auditEvents insert or recordAudit call. Add one or annotate with `// audit-exempt: <reason>` above the mutation.",
     });
   }
 }

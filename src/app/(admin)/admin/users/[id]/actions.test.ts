@@ -1,4 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// These mocks are required so `await import("@/lib/audit")` below succeeds in
+// the Vitest Node.js environment. audit.ts now transitively loads modules that
+// are not available or require env vars in plain Node.js:
+// - server-only: throws outside the Next.js bundler context.
+// - @/auth: loads next-auth → next/server, not resolvable without Next.js.
+// - @/lib/db: throws if DATABASE_URL is not set.
+// The tests only need AUDIT_ACTIONS string constants, not any of this behaviour.
+vi.mock("server-only", () => ({}));
+vi.mock("@/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/lib/db", () => ({ db: { insert: vi.fn().mockReturnValue({ values: vi.fn() }) } }));
 
 // Pure-logic regression tests for setTwoFactorRequired and forceResetTwoFactor.
 //

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Resend } from "resend";
 
 const apiKey = process.env.RESEND_API_KEY;
@@ -17,8 +19,6 @@ export type SendEmailInput = {
 
 export async function sendEmail(input: SendEmailInput) {
   if (!client) {
-    // In dev without a key, log instead of throwing. Production should
-    // surface a missing key loudly.
     if (process.env.NODE_ENV === "production") {
       throw new Error("RESEND_API_KEY is not set in production");
     }
@@ -40,6 +40,15 @@ export async function sendEmail(input: SendEmailInput) {
   return { id: res.data?.id ?? "" };
 }
 
+/**
+ * @deprecated Call enqueueEmail() directly with templateKey: 'password_reset'.
+ * Kept for fork backward compat. The two starter call sites have been migrated.
+ * Will be removed in a future version.
+ *
+ * NOTE: This intentionally calls sendEmail() directly (fire-and-forget) rather
+ * than enqueueEmail() to avoid a circular import:
+ *   send.ts → queue.ts → send.ts
+ */
 export async function sendPasswordResetEmail(to: string, rawToken: string) {
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";

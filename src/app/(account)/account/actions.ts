@@ -6,9 +6,9 @@ import { eq, and, ne } from "drizzle-orm";
 import { compare, hash } from "bcryptjs";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { users, auditEvents, emailVerificationTokens, passwordResetTokens } from "@/lib/db/schema";
-import { AUDIT_ACTIONS } from "@/lib/audit";
-import { sendEmail } from "@/lib/email";
+import { users, emailVerificationTokens, passwordResetTokens } from "@/lib/db/schema";
+import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
+import { enqueueEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import type { ActionResult } from "@/types/actions";
 
@@ -36,9 +36,7 @@ export async function updateProfile(input: {
     .set({ name })
     .where(eq(users.id, session.user.id));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_PROFILE_UPDATED,
     resourceType: "user",
     resourceId: session.user.id,
@@ -145,7 +143,7 @@ export async function requestEmailChange(input: {
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const verifyUrl = `${baseUrl}/account/verify-email/${rawToken}`;
 
-  await sendEmail({
+  await enqueueEmail({
     to: newEmail,
     subject: "Confirm your new email address",
     html: `
@@ -156,11 +154,10 @@ export async function requestEmailChange(input: {
       <p>If you did not request this change, you can safely ignore this email.</p>
     `,
     text: `Confirm your email change: ${verifyUrl}\n\nExpires in 24 hours. If you did not request this, ignore this email.`,
+    templateKey: "email_change_verify",
   });
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_EMAIL_CHANGE_REQUESTED,
     resourceType: "user",
     resourceId: session.user.id,
@@ -183,9 +180,7 @@ export async function cancelEmailChange(): Promise<ActionResult> {
     .delete(emailVerificationTokens)
     .where(eq(emailVerificationTokens.userId, session.user.id));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_EMAIL_CHANGE_CANCELLED,
     resourceType: "user",
     resourceId: session.user.id,
@@ -242,9 +237,7 @@ export async function changePassword(input: {
     .delete(passwordResetTokens)
     .where(eq(passwordResetTokens.userId, session.user.id));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_PASSWORD_CHANGED,
     resourceType: "user",
     resourceId: session.user.id,
@@ -267,9 +260,7 @@ export async function requestAccountDeletion(): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Unauthorized." };
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_DELETION_REQUESTED,
     resourceType: "user",
     resourceId: session.user.id,

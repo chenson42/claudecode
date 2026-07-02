@@ -5,10 +5,11 @@ import { randomBytes, createHash } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { db } from "@/lib/db";
-import { users, passwordResetTokens, auditEvents } from "@/lib/db/schema";
-import { AUDIT_ACTIONS } from "@/lib/audit";
-import { sendPasswordResetEmail } from "@/lib/email";
-import { getRequestIp, checkRateLimit } from "@/lib/rate-limit";
+import { users, passwordResetTokens } from "@/lib/db/schema";
+import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
+import { enqueueEmail } from "@/lib/email";
+import { getRequestIp } from "@/lib/request-ip";
+import { checkRateLimit } from "@/lib/rate-limit";
 import type { ActionResult } from "@/types/actions";
 
 function sha256Hex(raw: string): string {
@@ -64,24 +65,37 @@ export async function requestPasswordReset(input: {
   const tokenHash = sha256Hex(rawToken);
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 minutes
 
-  // Delete any existing in-flight reset token for this user (one per user).
-  // The uniqueIndex("ix_pwd_reset_user") on userId enforces this at the DB level.
+  // Upsert: if a reset token already exists for this user, overwrite it atomically.
+  // The uniqueIndex("ix_pwd_reset_user") on userId is the conflict target.
+  // This eliminates the delete-then-insert race window (two concurrent requests
+  // could both delete, then both insert, producing a 23505 on ix_pwd_reset_user).
   await db
-    .delete(passwordResetTokens)
-    .where(eq(passwordResetTokens.userId, userRow.id));
+    .insert(passwordResetTokens)
+    .values({ userId: userRow.id, token: tokenHash, expiresAt })
+    .onConflictDoUpdate({
+      target: passwordResetTokens.userId,
+      set: { token: tokenHash, expiresAt, createdAt: new Date() },
+    });
 
-  await db.insert(passwordResetTokens).values({
-    userId: userRow.id,
-    token: tokenHash,
-    expiresAt,
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
+  await enqueueEmail({
+    to: userRow.email,
+    subject: "Reset your password",
+    html: `
+      <p>Hi,</p>
+      <p>Someone requested a password reset for your account.</p>
+      <p>Click the link below to set a new password. This link expires in 60 minutes.</p>
+      <p><a href="${resetUrl}">${resetUrl}</a></p>
+      <p>If you did not request this, you can safely ignore this email.</p>
+    `,
+    text: `Click the link below to reset your password. This link expires in 60 minutes.\n\n${resetUrl}\n\nIf you did not request this, ignore this email.`,
+    templateKey: "password_reset",
   });
 
-  await sendPasswordResetEmail(userRow.email, rawToken);
-
-  await db.insert(auditEvents).values({
-    actorUserId: userRow.id,
-    actorEmail: userRow.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_PASSWORD_RESET_REQUESTED,
+    actor: { userId: userRow.id, email: userRow.email },
     resourceType: "user",
     resourceId: userRow.id,
     metadata: { email: userRow.email },
@@ -174,10 +188,9 @@ export async function consumeResetToken(input: {
     .set({ password: hashed })
     .where(eq(users.id, userRow.id));
 
-  await db.insert(auditEvents).values({
-    actorUserId: userRow.id,
-    actorEmail: userRow.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_PASSWORD_RESET_COMPLETED,
+    actor: { userId: userRow.id, email: userRow.email },
     resourceType: "user",
     resourceId: userRow.id,
     metadata: { via: "reset_token" },

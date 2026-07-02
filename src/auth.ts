@@ -18,7 +18,8 @@ import {
 import { authConfig } from "@/lib/auth/config";
 import { evaluateSignIn } from "@/lib/auth/sign-in-gate";
 import { ADMIN_ROLE, FEATURES, MEMBER_ROLE } from "@/lib/permissions";
-import { getRequestIp, checkRateLimit } from "@/lib/rate-limit";
+import { getRequestIp } from "@/lib/request-ip";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const INITIAL_ADMIN_EMAILS = (process.env.INITIAL_ADMIN_EMAILS ?? "")
   .split(",")

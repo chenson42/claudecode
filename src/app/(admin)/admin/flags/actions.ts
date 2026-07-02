@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { eq, sql } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { featureFlags, auditEvents } from "@/lib/db/schema";
+import { featureFlags } from "@/lib/db/schema";
 import { ADMIN_ROLE } from "@/lib/permissions";
-import { AUDIT_ACTIONS } from "@/lib/audit";
+import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
 
 export async function toggleFlagAction(formData: FormData) {
   const session = await auth();
@@ -24,9 +24,7 @@ export async function toggleFlagAction(formData: FormData) {
     .set({ enabled: next, updatedAt: sql`now()` })
     .where(eq(featureFlags.key, key));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.FEATURE_FLAG_TOGGLED,
     resourceType: "feature_flag",
     resourceId: key,

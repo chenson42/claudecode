@@ -4,6 +4,376 @@ Architectural and implementation decisions for the Claude Code Starter. Newest f
 
 ---
 
+## DECISION-022: SessionStart hook convention — `.mjs` with `@neondatabase/serverless`; registered in `.claude/settings.json`; prompt-injection boundary is count-only output
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-feedback-dev-loop`
+
+### Decision
+
+SessionStart hooks for this starter are written as Node ESM scripts (`scripts/*.mjs`) and registered in `.claude/settings.json` under the `hooks.SessionStart` array. The feedback hook specifically uses `@neondatabase/serverless` for a direct HTTP query rather than `tsx` + Drizzle.
+
+**Implementation conventions derived from this decision:**
+
+1. **Script extension:** `.mjs`, not `.ts`. Consistent with the existing `scripts/` convention (`check-audit-coverage.mjs`, `commit-msg.mjs`, `stats-escape.mjs`). No compile step, no tsx invocation — a hook must be fast and have zero friction on a fresh fork that has only run `npm install`.
+
+2. **Query mechanism:** `@neondatabase/serverless`'s `neon(DATABASE_URL)` tagged-template SQL. This package is already a production dependency — it is always present after `npm install` without any additional installation. It makes a single HTTP request and returns the result. No ORM initialization, no schema import, no TypeScript compilation.
+
+3. **Silent-skip invariant:** The script reads `DATABASE_URL` from `.env.local` in the project root (using `fs.readFileSync` in a try/catch). If the file is absent, the var is missing, or the DB query throws for any reason, the script exits 0 with no output. The hook is informational only; it must never block session startup.
+
+4. **Prompt-injection boundary (non-negotiable):** The hook prints ONLY a count integer and static operator instructions authored in the script source. It NEVER fetches or prints any feedback body, category, submitter name, or any other member-supplied content. The query is always `SELECT count(*) FROM feedback WHERE status = 'new'` — a scalar integer. This boundary must be stated in the script's header comment and is enforced by code review.
+
+5. **`.claude/settings.json` registration:**
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/feedback-check.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+   The existing `permissions` key remains at the top level alongside `hooks`. Tech-lead should verify the exact hook format against Claude Code's hook documentation when implementing; the shape above matches the `update-config` skill's documented convention but Claude Code hook syntax evolves.
+
+6. **Project-scoped (not user-scoped).** The hook lives in `.claude/settings.json` (checked into the repo), not in the user's `~/.claude/settings.json`. This means the hook fires for any Claude Code session in this project directory — for both the project author and any contributor who checks out the repo. This is the correct scope for the teaching-artifact and dev-loop posture.
+
+### Rationale
+
+**Why `.mjs` over `.ts`?** `tsx` is a devDependency present after `npm install`, so it IS available. But a SessionStart hook fires before any work has begun — before the dev server, before a build. Requiring tsx execution adds a compilation step, and any TypeScript error in the script (e.g., a missing type for an imported Drizzle schema that changed) could silently cause the hook to error. A `.mjs` with `@neondatabase/serverless` is simpler, faster, and cannot be broken by schema changes.
+
+**Why `@neondatabase/serverless` over Neon MCP?** The hook must work on any fork — including forks that do not configure the Neon MCP. `@neondatabase/serverless` is a production dependency that every fork inherits by default. The huddleup implementation shelled out to `psql`; that approach requires psql installed locally and a `DATABASE_URL_UNPOOLED` var (direct connection, not pooled). The HTTP-based `neon()` client uses the standard `DATABASE_URL` (pooled is fine for a single query) and requires no local tooling beyond Node.
+
+**Prompt-injection rationale.** Feedback body is user-supplied content. A malicious member could submit a body containing LLM instruction text designed to hijack the next Claude Code session that reads it. The only safe output from a hook that reads untrusted-user data is a count integer and literal strings from the script source. This is a hard security constraint documented here so it survives any future refactoring.
+
+### What is NOT changed
+
+- No new npm dependencies.
+- No schema change.
+- Existing `.claude/settings.json` `permissions` block is unchanged; `hooks` is a new top-level sibling.
+
+### Impact
+
+- Adds `scripts/feedback-check.mjs`.
+- Adds `hooks.SessionStart` block to `.claude/settings.json`.
+- CLAUDE.md: adds session-start checklist step (see CLAUDE.md changes enumerated in Phase 1 of the feedback work-log).
+
+---
+
+## DECISION-021: No `_components/` sub-convention in route groups; page-local interactive components colocated as named files; cross-route-group member actions in `(member)/<feature>/actions.ts`
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-feedback-dev-loop`
+
+### Decision
+
+Two sub-decisions bundled because they answer the same question: where does interactive or shared code live when it doesn't clearly belong to a single page?
+
+**1. `_components/` is NOT a convention in this starter.**
+
+Some Next.js projects create `_components/` subdirectories within route groups (e.g., `(member)/home/_components/FeedbackPromptCard.tsx`). This starter does NOT use this pattern.
+
+Reason: `_components/` is an ad-hoc local convention with no official Next.js meaning. Downstream forks that copy this pattern without understanding the precedent will apply it inconsistently — some routes get `_components/`, some don't, and the distinction between "local component" and "shared component" blurs. The starter's two-tier system is cleaner:
+
+- **Colocated at page level:** components used only by one page live as named `.tsx` files alongside `page.tsx` in the same directory (e.g., `src/app/(admin)/admin/users/[id]/deactivate-card.tsx`, `src/app/(admin)/admin/users/[id]/two-factor-card.tsx`). This pattern is already established in the codebase.
+- **`src/components/shared/`:** components used by more than one route group or page. No `src/components/admin/` directory has been created yet — colocated admin components handle that need. If the admin surface grows to a point where shared admin components accumulate, a `src/components/admin/` directory can be introduced via a separate DECISION.
+
+For the feedback feature specifically:
+- `FeedbackPromptCard` (client island, used only at `/home`) → `src/app/(member)/home/feedback-prompt-card.tsx`
+- `FeedbackForm` (used at `/home` dialog AND `/account` form) → `src/components/shared/feedback-form.tsx`
+- `FeedbackStatusControl` (admin triage client island, used only at `/admin/feedback`) → `src/app/(admin)/admin/feedback/feedback-status-control.tsx`
+
+**2. Cross-route-group member server actions live in `(member)/<feature>/actions.ts`.**
+
+When a server action is needed from two different route groups (e.g., `submitFeedback()` is called from both `(member)/home` and `(account)/account`), the action lives in a named subdirectory under the primary route group that owns the feature: `src/app/(member)/feedback/actions.ts`.
+
+Why not `src/lib/`? `src/lib/` is for pure server-side utilities, ORM helpers, and cross-cutting infrastructure — not for product-level mutations with auth checks and rate limits. Putting `submitFeedback()` in `src/lib/` would break the separation between "library code" and "application code that happens to be shared."
+
+Why not colocated with the home page? `src/app/(member)/home/actions.ts` would force the account page to import from the home page's directory, which is semantically wrong (the account page doesn't "belong" to the home page's module). A sibling directory `(member)/feedback/` is semantically correct: it's a feature module within the member route group.
+
+Cross-group import: `import { submitFeedback } from "@/app/(member)/feedback/actions"` from `(account)/account/page.tsx` is allowed. Next.js route groups are organizational and do not create module isolation boundaries — the parentheses affect URL structure only, not module resolution.
+
+### Convention going forward
+
+- No new `_components/` directories.
+- Page-local interactive components: named `.tsx` colocated with `page.tsx`.
+- Shared cross-route-group components: `src/components/shared/`.
+- Member-facing server actions used from multiple route groups: `src/app/(member)/<feature>/actions.ts`.
+- Admin-only server actions: colocated `actions.ts` in the admin page directory.
+
+### What is NOT changed
+
+- `src/components/shared/` and `src/components/ui/` are unchanged.
+- Existing colocated admin components (deactivate-card.tsx, two-factor-card.tsx) are unchanged and confirmed as the precedent.
+- No new npm dependencies. No schema change.
+
+### Impact
+
+- `src/app/(member)/feedback/actions.ts` — new module (Phase 4: api-developer)
+- `src/app/(member)/home/feedback-prompt-card.tsx` — new colocated client island (Phase 4: ux-developer)
+- `src/components/shared/feedback-form.tsx` — new shared component (Phase 4: ux-developer)
+- `src/app/(admin)/admin/feedback/feedback-status-control.tsx` — new colocated admin client island (Phase 4: ux-developer)
+
+---
+
+## DECISION-020: NextAuth 5 beta.31 credentials endpoint always returns HTTP 302; `json=true` is a no-op; success check is `status < 400`
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-e2e-auth-infra`
+
+### Decision
+
+`POST /api/auth/callback/credentials` in NextAuth 5 beta.31 (Auth.js beta) **always** returns HTTP 302, regardless of whether `json=true` is included in the form body. It never returns a 2xx JSON response. The session cookie is issued in the `Set-Cookie` header of the 302 response. The redirect `Location` is derived from `AUTH_URL` (the env var), not the request host — so it may point at a different port than the test server.
+
+**Implementation rules derived from this finding:**
+
+1. Do NOT use `callbackRes.ok()` to check for sign-in success — it returns `false` on 302.
+2. Do NOT include `json=true` in the credentials POST form data — it has no effect and adds misleading code (it was a NextAuth v4 convention that is not honored in v5 beta.31).
+3. Do NOT include `totpCode` — the starter's `authorize()` accepts `email` and `password` only; undeclared fields are silently dropped.
+4. Success check: `callbackRes.status() < 400`. Any 4xx or 5xx is a hard failure; 3xx is the expected success response.
+5. Use `maxRedirects: 0` on the Playwright `request.post()` call to prevent Playwright from following the 302 to `AUTH_URL` (which may be a different host/port). The session cookie is captured from the first response.
+6. Verify session by calling `GET /api/auth/session` with the captured cookies and asserting `session.user.email === expectedEmail`.
+
+### Evidence
+
+Live probe run against `npm run dev -- -p 3100` with `SEED_ADMIN_EMAIL=admin@claudecode.info` credentials (2026-07-01):
+- GET `/api/auth/csrf` → 200 OK, `{"csrfToken":"..."}`, sets `authjs.csrf-token` cookie.
+- POST `/api/auth/callback/credentials` (without `json=true`) → 302, `location: http://localhost:3000`, `set-cookie: authjs.session-token=<JWE>`.
+- POST `/api/auth/callback/credentials` (with `json=true`) → identical 302, identical session cookie.
+- GET `/api/auth/session` with session cookie → 200 OK, full session JSON with `user.email`, `user.roles`, `user.features`, `user.twoFactorRequired`, `user.twoFactorVerified`.
+
+### What is NOT changed
+
+- The NextAuth sign-in flow for users in the browser is unaffected — this decision applies only to programmatic API calls in `globalSetup`.
+- The `callbackUrl` form field should be set to `${baseURL}/home` for clarity and to satisfy any future strict-origin validation.
+
+---
+
+## DECISION-019: E2E testing conventions — `e2e/support/` directory, API sign-in for storageState, DB isolation guard posture, per-spec `test.use()`
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-e2e-auth-infra`
+
+### Decision
+
+Four sub-decisions bundled because they form one cohesive e2e testing convention layer:
+
+**1. `e2e/support/` for non-spec infrastructure.**
+All Playwright infrastructure that is not a test file belongs in `e2e/support/`. At minimum: `e2e/support/global-setup.ts`. If the module grows to warrant splitting (e.g., a reusable auth-helper extracted from setup), `e2e/support/auth-helpers.ts` is the correct destination. Spec files remain flat in `e2e/`. This mirrors the npvitals pattern and is the convention downstream forks copy.
+
+**2. Per-spec `test.use({ storageState })`, not per-role Playwright projects.**
+`playwright.config.ts` gains one addition: `globalSetup: './e2e/support/global-setup.ts'`. The existing single Chromium project and flat spec structure are otherwise unchanged. New specs and the role-boundaries spec opt in to cached auth via `test.use({ storageState: 'e2e/support/.auth/admin.json' })` at the describe-block level. Existing tests continue to drive the sign-in UI without breaking — adoption is incremental. Per-role Playwright projects (one project per auth role, each project pre-sets storageState) are rejected because they would require splitting existing multi-role spec files and restructuring the 20 passing tests — too much churn for the benefit at the starter's current scale.
+
+**3. API sign-in in globalSetup; fail loudly on acquisition failure.**
+The `globalSetup` acquires per-role sessions by POSTing to NextAuth's credentials endpoint (`/api/auth/callback/credentials` with a fresh CSRF token from `/api/auth/csrf`, then verifying via `/api/auth/session`) rather than driving the sign-in UI. Saved `.json` files live under `e2e/support/.auth/` (gitignored). Refresh logic: re-acquire if the file is absent or older than 12 h.
+
+Stale-state posture: when credentials env vars are set and the API sign-in fails or returns an unauthenticated session, `globalSetup` throws. In CI, a stale or invalid storageState that goes undetected is worse than a hard build failure. When credentials vars are absent, `globalSetup` skips that role's acquisition; per-spec `test.skip(!SEED_*)` guards continue to gate those tests as before.
+
+**4. DB isolation guard: warn locally, hard-block in CI.**
+`globalSetup` inspects `DATABASE_URL`. If the host matches `*.neon.tech`:
+- **Local dev (no `CI` env var):** print a prominent stderr warning naming the risk and continue. The author's own dev runs are against a Neon dev DB; blocking here would break them immediately.
+- **CI (`CI=true`):** throw with an actionable message unless `E2E_DATABASE_URL` (a separate isolated DB URL) or `E2E_ALLOW_SHARED_DB=true` (explicit opt-out) is set. This protects fork CI pipelines from silently polluting a shared Neon database.
+- `E2E_ALLOW_SHARED_DB=true` overrides the CI hard-fail in both local and CI; teams that intentionally share a DB own the risk.
+
+### Rationale
+
+1. **Teaching-artifact lens on directory shape.** The `e2e/support/` separation is the natural Playwright home for infrastructure that is not a spec. Showing it explicitly — rather than a flat helpers.ts alongside spec files — is the pattern downstream forks are most likely to copy and extend correctly. A flat structure that mixes spec files and infrastructure requires forks to invent the separation themselves.
+
+2. **Minimal churn over optimal shape.** The per-role Playwright project split is architecturally cleaner but requires restructuring the existing 20 tests. At the starter's current scale, the churn is disproportionate to the benefit. Per-spec `test.use()` achieves the same caching with zero changes to existing specs and a clear incremental migration path.
+
+3. **API sign-in is faster and more durable for setup.** UI sign-in is the right thing to test in specs — it exercises the sign-in page, form, and NextAuth redirect. For globalSetup (acquiring a session that dozens of specs reuse), the UI path is brittle: a rendering delay or selector change fails the acquisition for all specs. The API path is a direct, stable contract with NextAuth.
+
+4. **DB guard protects forks without breaking the author's workflow.** The author's `DATABASE_URL` is a Neon dev database. A hard block at any posture would make the guard the first thing a fork owner removes. The warn-locally / block-in-CI split makes the guard meaningful for the audience that matters most (fork CI pipelines) while leaving the author's workflow intact.
+
+### Convention going forward
+
+- Any new e2e infrastructure file (fixtures, page objects, setup utilities) lives in `e2e/support/`.
+- Spec files that need authenticated sessions call `test.use({ storageState: 'e2e/support/.auth/<role>.json' })` at the describe-block level. They do NOT sign in via UI in `beforeEach`.
+- `e2e/support/.auth/` is gitignored. CI re-acquires fresh state on each run via `globalSetup`.
+- The DB isolation guard posture must not be weakened without an explicit decision revision here.
+
+### What is NOT changed
+
+- No new npm dependencies. Playwright is already present.
+- No schema changes.
+- Seed script: no changes required. The three seeded users already exist with the correct attributes.
+- TOTP enrolment e2e is explicitly out of scope (tracked as a Backlog item in `docs/TODO.md`).
+
+### Impact
+
+- Adds `e2e/support/global-setup.ts`.
+- Adds `e2e/support/.auth/` directory pattern (gitignored).
+- `playwright.config.ts`: adds `globalSetup: './e2e/support/global-setup.ts'`.
+- Adds `e2e/role-boundaries.spec.ts`.
+- `.env.example`: adds commented `E2E_ALLOW_SHARED_DB` entry.
+- `docs/TODO.md`: adds "TOTP enrolment e2e" to Backlog.
+
+---
+
+## DECISION-018: Email module splits into `src/lib/email/` directory; queue stores rendered HTML at rest
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-email-queue`
+
+### Sub-decision 1 — Directory split
+
+`src/lib/email.ts` (single file, currently 61 lines) is promoted to `src/lib/email/` with three files:
+
+- `send.ts` — the existing `sendEmail()` low-level transport + `sendPasswordResetEmail()` template function.
+- `queue.ts` — `enqueueEmail()`, the atomic claim function, the process/retry loop, and dev intercept/redirect env-var handling.
+- `index.ts` — barrel that re-exports `sendEmail`, `sendPasswordResetEmail`, and `enqueueEmail`. Existing call sites at `@/lib/email` continue to work without path changes.
+
+**Rationale:**
+
+1. **Readability threshold.** The queue module adds an enqueue function, a single-statement CTE claim query, a process/retry loop with exponential backoff, and dev-intercept/redirect handling — roughly 150–200 lines. Combined with the existing 61 lines, a single file would exceed 220 lines of mixed concerns (transport + persistence + scheduling). The starter's mandate is a "small, opinionated baseline that stays readable." A 220-line file with two unrelated concerns (send vs. queue) is not single-pass readable for a fork developer.
+
+2. **Distinct concerns.** `send.ts` answers "how do I send an email now?" `queue.ts` answers "how do I persist an email so it's sent reliably later?" These are different enough that coupling them in one file would mislead fork developers about which part to edit when adding a new template (send.ts) vs. tuning retry policy (queue.ts).
+
+3. **`src/lib/auth/` precedent.** The auth module was a single `auth.ts` before it outgrew a single concern; it now lives in `src/lib/auth/` with `config.ts`, `safe-callback.ts`, `sign-in-gate.ts`, and a request-ip module extracted alongside it. The same progression applies here. A directory is the right structure once the module has two meaningfully separate responsibilities.
+
+4. **Zero import-path churn at existing call sites.** The barrel re-export at `index.ts` means `import { sendEmail } from "@/lib/email"` continues to resolve exactly as before. No call site needs updating.
+
+**What is NOT a directory split:**
+
+Smaller modules with one concern stay as single files. `flags.ts`, `permissions.ts`, `two-factor.ts`, `rate-limit.ts` are all single-file because each has one primary responsibility. The rule is: a directory when there are two meaningfully distinct concerns that a fork developer would want to find and edit independently.
+
+### Sub-decision 2 — Store rendered HTML at rest
+
+The `email_queue` table stores the **fully rendered HTML body** (and plain-text body) in columns on the row, not a template key + JSON params.
+
+**Rationale:**
+
+1. **Matches the existing `SendEmailInput` interface.** `sendEmail()` already accepts `{ to, subject, html, text? }`. `enqueueEmail()` wraps `sendEmail()`'s input — it would accept the same shape. Storing what the transport already receives requires no re-render step and no template registry in the queue.
+
+2. **Simpler to implement and teach.** A template-key + JSON-params approach requires the queue processor to know how to invoke each template function by name, maintain a template registry, and re-render on every retry. That's a non-trivial indirection that adds complexity without benefiting the starter's primary audience.
+
+3. **Retries are safe without re-rendering.** The rendered HTML and resolved reset/verify URLs are correct at enqueue time. Retrying the same rendered row is safe — the link was already generated and the recipient is already determined. Template-at-send-time re-rendering would re-resolve relative timestamps, which could behave differently on the 4th retry.
+
+4. **Tradeoff documented for forks.** Storing rendered HTML does persist more data (full HTML, including any user-supplied name or email address rendered into the template). Forks with strict data-minimization requirements should store template key + JSON params and re-render at send time. This architectural note belongs in a comment at the `emailQueue` table definition in `schema.ts`.
+
+### Convention going forward
+
+Any future email send site: call `enqueueEmail({ to, subject, html, text? })`. Do not call `sendEmail()` directly from server actions or pages — the queue is the only sanctioned path for outbound email. `sendEmail()` is an internal transport function called only by the queue processor. This invariant prevents silent-drop regressions if the queue is bypassed.
+
+### Impact
+
+- `src/lib/email.ts` is deleted; replaced by `src/lib/email/send.ts`, `src/lib/email/queue.ts`, `src/lib/email/index.ts`.
+- All existing `import ... from "@/lib/email"` call sites continue to work via the barrel.
+- New `emailQueue` table in `src/lib/db/schema.ts` with columns: `id`, `to` (recipient email, text), `subject`, `html`, `text` (nullable), `status` (text: `'queued' | 'processing' | 'sent' | 'failed'`), `attemptCount`, `maxAttempts`, `nextRetryAt` (timestamp with timezone), `claimedAt` (timestamp with timezone, nullable), `sentAt` (timestamp with timezone, nullable), `lastError` (text, nullable), `providerMessageId` (text, nullable), `createdAt`, `updatedAt`.
+- Composite index on `(status, nextRetryAt)` for the claim query.
+- `import "server-only"` in both `send.ts` and `queue.ts`.
+
+---
+
+## DECISION-017: `getRequestIp()` extracted to `src/lib/request-ip.ts`; canonical IP-extraction precedence established
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-record-audit-helper`
+
+### Decision
+
+IP extraction is extracted from `src/lib/rate-limit.ts` into a new shared module at `src/lib/request-ip.ts`. Both `rate-limit.ts` (which previously owned the implementation) and the new `recordAudit()` helper in `src/lib/audit.ts` import `getRequestIp()` from there.
+
+The canonical IP-extraction precedence for this starter is:
+
+1. `cf-connecting-ip` — if present, unconditionally trusted. Cloudflare sets this at the network edge; it cannot be injected by clients on Cloudflare-fronted deployments. If Cloudflare is not in the path, the header is absent (Vercel strips unrecognized headers), so there is no spoofing risk.
+2. `x-forwarded-for` (first value) — consulted only when `TRUST_PROXY_HEADERS=true`. Explicitly opt-in because XFF is trivially spoofable without a controlled proxy chain.
+3. `x-real-ip` — the Vercel-set fallback. Reliable on Vercel without any env-var configuration; absent in local dev.
+
+### Rationale
+
+1. **Avoid coupling two unrelated modules.** Before this decision, `getRequestIp()` lived in `src/lib/rate-limit.ts`, a rate-limiting module. Having `src/lib/audit.ts` import from `rate-limit.ts` just to get an IP would be a backwards dependency: auditing would depend on rate-limiting infrastructure. Extracting the function removes that coupling entirely.
+
+2. **Single source of truth.** The starter previously had no `cf-connecting-ip` handling in rate limiting and would have had a different precedence in auditing if the fertilityluna reference were copied verbatim. Two different IP-extraction implementations in the same request path (rate limiting sees one IP; audit log sees another) defeat the forensic purpose of the audit log. A shared module ensures both subsystems see the same client IP for the same request.
+
+3. **Correct precedence.** The original `getRequestIp()` never checked `cf-connecting-ip`. This is fixed in the extracted version. Any fork running behind Cloudflare now gets consistent, correct IP attribution in both rate-limit keys and audit rows.
+
+4. **Teaching artifact clarity.** `src/lib/request-ip.ts` is a purpose-named, single-function module — analogous to `src/lib/flags.ts` and `src/lib/permissions.ts`. A fork developer looking for "where does IP extraction live?" has one obvious answer.
+
+### Convention going forward
+
+Any future module that needs the client IP (e.g., geo-gating, abuse detection) imports `getRequestIp()` from `@/lib/request-ip`. Do not re-implement inline.
+
+### What is NOT changed
+
+- The behavior of `TRUST_PROXY_HEADERS` is unchanged; the env-var semantics are identical to the prior implementation.
+- `rate-limit.ts` behavior is unchanged; it now delegates to `request-ip.ts` instead of housing the implementation.
+- No schema change, no permission change, no feature flag.
+
+### Impact
+
+- Adds `src/lib/request-ip.ts` with `getRequestIp(hdrs)` implementing the three-tier precedence above.
+- `src/lib/rate-limit.ts`: remove local `getRequestIp` function; add `import { getRequestIp } from "@/lib/request-ip"`.
+- `src/lib/audit.ts`: import `getRequestIp` from `@/lib/request-ip`; use in `recordAudit()`.
+
+---
+
+## DECISION-016: `trustHost: true` set in code, not env-only
+
+**Status:** Resolved
+**Date:** 2026-07-01
+**Feature:** `2026-07-01-nextauth-trusthost` (BUG-4)
+
+### Decision
+
+Add `trustHost: true` directly to the `authConfig` object in `src/lib/auth/config.ts`, not as a deployment-time env var requirement.
+
+### Placement: `config.ts`, not `auth.ts`
+
+`trustHost` is placed in `authConfig` (rather than in the `NextAuth({...})` options object in `src/auth.ts`) for one concrete reason: `authConfig` is a directly importable TypeScript object, so `config.test.ts` can assert `authConfig.trustHost === true` with zero mocking. `src/auth.ts` exports only the NextAuth result (`handlers`, `auth`, `signIn`, `signOut`, `unstable_update`), not the raw config — there is no testable surface there without reaching into NextAuth internals.
+
+The edge-runtime note in `config.ts` is unaffected: `trustHost` is a declarative property with no node-only import, so it is safe on the Edge runtime. The edge proxy (`proxy.ts`) doesn't execute OAuth callbacks and is indifferent to the flag — it is present because `authConfig` is the shared base, not because the proxy needs it.
+
+### Code vs Env rationale
+
+| Factor | Code (`trustHost: true`) | Env (`AUTH_TRUST_HOST=true`) |
+|--------|--------------------------|------------------------------|
+| Fork-and-go audience | Works with zero env config | Requires deployer to discover and set the var before the production failure |
+| fpcw production incident | Proven fix (`e47322a`) | Would have required the deployer to know the var existed |
+| Security posture | Same as Vercel's auto-trust via `VERCEL` env | Same — Vercel doesn't require the deployer to opt in either |
+| Proxy hygiene assumption | Must set Host header correctly | Identical assumption |
+| Env override available | Yes — `AUTH_URL` or `AUTH_TRUST_HOST` still work as alternatives | N/A |
+
+The starter's explicit goal is "fork-and-go." An env-only fix requires deployers to read the right docs section before shipping — the fpcw incident proves that does not happen reliably. The code-level fix mirrors the security posture Vercel itself accepts (auto-trusting via an env signal the platform sets, not one the deployer sets).
+
+### Deployment assumption
+
+The reverse proxy terminating TLS must set the `Host` header from the public hostname. This is standard behaviour for nginx, Caddy, Cloudflare (proxy and Tunnel), Kinsta, Railway, Fly.io, Render, and any other well-configured proxy. A misconfigured proxy that passes the internal hostname creates a host-header injection risk — but that same misconfiguration breaks OAuth URL construction regardless of this flag. The code comment at the config site names this assumption explicitly.
+
+### What is NOT changed
+
+- No permission, flag, schema, or session/JWT semantic change.
+- No new npm dependency.
+- The `AUTH_URL` env var continues to act as an independent `trustHost` signal — deployers who set `AUTH_URL=https://myapp.com` in production get the same effect via NextAuth's env detection. The `.env.example` comment is strengthened to make this explicit.
+
+### Alternatives rejected
+
+- **`AUTH_TRUST_HOST=true` env-only:** Rejected. Requires deployer awareness before the production failure. Contradicts the fork-and-go goal.
+- **`AUTH_URL` comment strengthening only:** Partial mitigation. Covers deployers who correctly set `AUTH_URL`; does not cover those who leave it at the default (common since v4 `NEXTAUTH_URL` muscle memory).
+- **Placing `trustHost` in `src/auth.ts`:** Rejected. No testable surface without mocking NextAuth internals.
+
+### Impact
+
+- `src/lib/auth/config.ts`: add `trustHost: true` with a multi-line comment naming the off-Vercel rationale and the security assumption.
+- `src/lib/auth/config.test.ts`: add one assertion — `expect(authConfig.trustHost).toBe(true)`.
+- `.env.example`: strengthen the `AUTH_URL` comment; add a commented `AUTH_TRUST_HOST` line documenting the env-only alternative.
+
+---
+
 ## DECISION-015: `signIn` callback — drop credentials belt-and-suspenders lookup; OAuth gate uses email key
 
 **Status:** Resolved

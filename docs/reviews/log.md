@@ -39,6 +39,7 @@ If three retrospectives in a row produce nothing, the cadence itself is suspect 
 ## Entries
 
 <!-- newest entries go here, above the older ones -->
+2026-07-01 | test-coverage | Phase 5 sweep (4 pipelines): 259/259 unit tests green; 24/24 e2e green; critical modules (permissions, two-factor, flags, audit, request-ip, errors) all 100% stmts; email/queue.ts 68.75% stmts (untested runtime paths acceptable); overall 62.29% stmts on covered files
 2026-07-01 | agent-instruction | Harvest Tier 3 applied: qa feature-gate table + no-self-agreeing-mocks, deployment-engineer force-push guardrail (+ Workflow Rule 11), pre-push CVE step, database-admin onDelete rule, api-developer email-escape rule
 2026-07-01 | test-coverage | Phase 5 sweep: 4 critical modules at 100% (permissions, two-factor, flags, safe-callback); overall 77.4% stmts; 175/175 unit tests green; 20/20 e2e tests green
 2026-05-18 | test-coverage | flags.ts and two-factor.ts brought to 100% coverage (6 + 28 tests); full suite 139/139 green; typecheck clean
