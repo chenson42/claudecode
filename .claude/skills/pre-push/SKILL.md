@@ -7,6 +7,20 @@ description: Run pre-push verification — typecheck, build, schema/migration ch
 
 When the user invokes `/pre-push`, run every verification step required before pushing to `main`. This skill never pushes — it only reports readiness.
 
+## Step 0: Check for Open Test File (HARD STOP)
+
+Before doing anything else, check whether an open pre-merge test file exists:
+
+```bash
+ls docs/pre-merge-tests-v*.md 2>/dev/null && echo "EXISTS" || echo "CLEAR"
+```
+
+If any such file exists: **STOP immediately.** Do not proceed to any further steps. Tell the user which file was found:
+
+> `docs/pre-merge-tests-vX.Y.Z.md` is still open. Run `/test-results` to record the test results and close the file before pushing.
+
+Only continue to Step 1 if no file is found.
+
 ## Step 1: Snapshot the Current State
 
 Run, in parallel:
@@ -56,7 +70,23 @@ npm run check:audit
 
 **Do not proceed if the audit-coverage check fails.**
 
-## Step 3c: Unit Tests
+## Step 3c: sql<Date> Tripwire
+
+```bash
+npm run check:sql-date
+```
+
+`scripts/check-sql-date.mjs` walks every `.ts` and `.tsx` under `src/` and fails
+if it finds `sql<Date` without an annotation. The Neon serverless driver returns
+timestamps from computed expressions (COALESCE, date_trunc, etc.) as strings at
+runtime — `sql<Date>` is a compile-time lie that TypeScript cannot detect. Fix by:
+selecting real column(s) and converting in JS, using `.mapWith(Date)`, or annotating
+with `// sql-date-ok: <reason>` when the expression is used only in WHERE/ORDER and
+is never selected/returned to JS.
+
+**Do not proceed if the sql-date check fails.**
+
+## Step 3d: Unit Tests
 
 ```bash
 npm test
@@ -114,6 +144,10 @@ If the seed (`scripts/seed.ts`) changed, suggest running `npm run db:seed` again
 
 Treat these as advisory warnings, not hard blockers (unless the user decides otherwise):
 
+- **`docs/TODO.md` reconciled?** (Workflow Rule 10.) If the outgoing commits ship, defer, or discover work, the corresponding TODO lines must move/appear in those same commits:
+  ```bash
+  git diff main...HEAD --name-only | grep -q "docs/TODO.md" || echo "WARN: no TODO.md change in this branch — verify nothing shipped/deferred/discovered"
+  ```
 - **New environment variables?** Documented in `CLAUDE.md` (and `.env.example` if present)?
 - **New tables or columns?** Defined in `src/lib/db/schema.ts`?
 - **New routes or actions?** Auth + feature gate present on every protected entry?
@@ -130,6 +164,19 @@ Treat these as advisory warnings, not hard blockers (unless the user decides oth
   git diff --name-only | grep -E "\.env"
   ```
 
+## Step 7b: Dependency CVE Audit
+
+```bash
+npm audit --audit-level=moderate
+```
+
+Severity gate:
+- **PASS** — no vulnerabilities, or `info`-level only.
+- **WARN** — `moderate` vulnerabilities only; list the advisory IDs as informational. Not a hard blocker, but surface them in the summary so the user can decide.
+- **FAIL** — one or more `high` or `critical` vulnerabilities; list the advisory IDs and ask the user whether to block the push.
+
+If `npm audit` times out or the registry is unreachable, record `WARN (registry unreachable)` and continue — don't let a transient network failure block a clean push.
+
 ## Step 8: Summary
 
 Report results:
@@ -138,6 +185,7 @@ Report results:
 - Production build: PASS / FAIL
 - Schema and migrations: in sync / pending (with details)
 - Release notes + version: updated / missing
+- Dependency CVE audit: PASS / WARN / FAIL (advisory IDs if any)
 - Housekeeping warnings: list them
 - **Ready to push? yes / no**
 - If no: list each item that must be resolved first

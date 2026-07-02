@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { auth, unstable_update } from "@/auth";
 import { db } from "@/lib/db";
-import { roles, users, userRoles, auditEvents } from "@/lib/db/schema";
+import { roles, users, userRoles } from "@/lib/db/schema";
 import { ADMIN_ROLE, FEATURES, hasFeature } from "@/lib/permissions";
-import { AUDIT_ACTIONS } from "@/lib/audit";
+import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
 
 async function requireAdmin() {
   const session = await auth();
@@ -37,9 +37,7 @@ export async function assignRoleAction(formData: FormData) {
     .values({ userId, roleId })
     .onConflictDoNothing();
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_ROLE_ASSIGNED,
     resourceType: "user",
     resourceId: userId,
@@ -64,9 +62,7 @@ export async function removeRoleAction(formData: FormData) {
     .delete(userRoles)
     .where(and(eq(userRoles.userId, userId), eq(userRoles.roleId, role.id)));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_ROLE_REMOVED,
     resourceType: "user",
     resourceId: userId,
@@ -117,9 +113,7 @@ export async function deactivateUser(input: {
     .set({ isActive: false })
     .where(eq(users.id, input.userId));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_DEACTIVATED,
     resourceType: "user",
     resourceId: input.userId,
@@ -149,9 +143,7 @@ export async function reactivateUser(input: {
     .set({ isActive: true })
     .where(eq(users.id, input.userId));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_REACTIVATED,
     resourceType: "user",
     resourceId: input.userId,
@@ -160,5 +152,35 @@ export async function reactivateUser(input: {
 
   revalidatePath("/admin/users");
   revalidatePath(`/admin/users/${input.userId}`);
+  return { ok: true };
+}
+
+export async function unlockUserAction(input: {
+  userId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await requireAdminUsers();
+  if (!session) return { ok: false, error: "Forbidden." };
+
+  const target = await db.query.users.findFirst({
+    where: eq(users.id, input.userId),
+    columns: { id: true },
+  });
+  if (!target) return { ok: false, error: "User not found." };
+
+  // Idempotent: setting null → null and 0 → 0 on an already-unlocked user
+  // is a no-op. This cleanly handles race conditions and expired-lock rows.
+  await db
+    .update(users)
+    .set({ lockedUntil: null, failedLoginAttempts: 0 })
+    .where(eq(users.id, input.userId));
+
+  await recordAudit({
+    action: AUDIT_ACTIONS.USER_ACCOUNT_UNLOCKED,
+    resourceType: "user",
+    resourceId: input.userId,
+    metadata: { clearedByAdminId: session.user.id },
+  });
+
+  revalidatePath("/admin/users");
   return { ok: true };
 }

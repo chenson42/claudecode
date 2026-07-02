@@ -1,6 +1,6 @@
 {
   "name": "claudecode-nextjs-starter",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "private": true,
   "description": "Fork-and-go Next.js + Neon + NextAuth starter with admin, roles/permissions, TOTP 2FA, feature flags, and release notes. Authored as a Claude Code training artifact.",
   "engines": {
@@ -22,6 +22,8 @@
     "prepare": "node -e \"if(require('fs').existsSync('.git'))require('child_process').execSync('bash scripts/install-hooks.sh',{stdio:'inherit'})\"",
     "stats:escape": "node scripts/stats-escape.mjs",
     "check:audit": "node scripts/check-audit-coverage.mjs",
+    "check:sql-date": "node scripts/check-sql-date.mjs",
+    "check": "npm run check:audit && npm run check:sql-date",
     "deck": "npm run deck:pptx && npm run deck:pdf",
     "deck:pptx": "npx --yes @marp-team/marp-cli deck/slides.md --pptx --allow-local-files",
     "deck:pdf": "npx --yes @marp-team/marp-cli deck/slides.md --pdf --allow-local-files",
@@ -52,6 +54,7 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "resend": "^6.12.3",
+    "server-only": "^0.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0"
   },

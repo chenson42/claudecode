@@ -6,13 +6,12 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import {
   users,
-  auditEvents,
   userTotp,
   userTotpRecoveryCodes,
   userTotpPendingEnrollments,
 } from "@/lib/db/schema";
 import { FEATURES, hasFeature } from "@/lib/permissions";
-import { AUDIT_ACTIONS } from "@/lib/audit";
+import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
 
 async function requireAdminUsers() {
   const session = await auth();
@@ -53,9 +52,7 @@ export async function setTwoFactorRequired(input: {
     .set({ twoFactorRequired: input.required })
     .where(eq(users.id, input.userId));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_2FA_REQUIRED_CHANGED,
     resourceType: "user",
     resourceId: input.userId,
@@ -74,6 +71,7 @@ export async function setTwoFactorRequired(input: {
 // The three DELETEs are sequential and idempotent. The Neon HTTP driver does
 // not support db.transaction() on the pooled connection, so we follow the same
 // pattern as resetEnrollmentAction in src/app/(admin)/admin/2fa/actions.ts.
+// For atomic multi-write, use db.batch() instead — see DECISION-014 in docs/decisions.md.
 //
 // Known gap: the target user's twoFactorVerified JWT claim stays true until
 // their JWT expires (typically 30 days). There is no session DB to invalidate
@@ -102,9 +100,7 @@ export async function forceResetTwoFactor(input: {
     .delete(userTotpPendingEnrollments)
     .where(eq(userTotpPendingEnrollments.userId, input.userId));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_2FA_FORCE_RESET,
     resourceType: "user",
     resourceId: input.userId,

@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { users, roles, userRoles } from "@/lib/db/schema";
 import { desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import Link from "next/link";
-import { assignRoleAction, removeRoleAction } from "./actions";
+import { assignRoleAction, removeRoleAction, unlockUserAction } from "./actions";
 import { FormattedDate } from "@/components/shared/formatted-date";
 
 const PAGE_SIZE = 25;
@@ -35,6 +35,7 @@ export default async function UsersPage({
       isActive: users.isActive,
       lastLoginAt: users.lastLoginAt,
       twoFactorRequired: users.twoFactorRequired,
+      lockedUntil: users.lockedUntil,
     })
     .from(users)
     .where(whereExpr)
@@ -129,6 +130,29 @@ export default async function UsersPage({
                     <span className="mt-1 inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
                       2FA exempt
                     </span>
+                  )}
+                  {u.lockedUntil && u.lockedUntil > new Date() && (
+                    <>
+                      <span className="mt-1 inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                        Locked until{" "}
+                        <FormattedDate value={u.lockedUntil} mode="datetime" />
+                      </span>
+                      <form
+                        action={async (fd: FormData) => {
+                          "use server";
+                          await unlockUserAction({ userId: fd.get("userId") as string });
+                        }}
+                        className="mt-1"
+                      >
+                        <input type="hidden" name="userId" value={u.id} />
+                        <button
+                          type="submit"
+                          className="rounded border border-border px-2 py-0.5 text-xs hover:bg-muted"
+                        >
+                          Unlock
+                        </button>
+                      </form>
+                    </>
                   )}
                 </td>
                 <td>

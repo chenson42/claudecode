@@ -23,5 +23,17 @@
     ],
     "ask": [],
     "deny": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/feedback-check.mjs"
+          }
+        ]
+      }
+    ]
   }
 }

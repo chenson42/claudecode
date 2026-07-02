@@ -56,7 +56,9 @@ export async function proxy(req: NextRequest) {
     if (rule.pattern.test(pathname)) {
       const ok = session.user.features?.includes(rule.required);
       if (!ok) {
-        return NextResponse.redirect(new URL("/access-pending", req.url));
+        const dest = new URL("/access-pending", req.url);
+        dest.searchParams.set("from", pathname);
+        return NextResponse.redirect(dest);
       }
       return NextResponse.next();
     }
@@ -73,7 +75,7 @@ export async function proxy(req: NextRequest) {
   // swallow /account/* routes. If you add a new route family that needs its own
   // access control, add an explicit rule to PROTECTION_RULES above.
   //
-  // Auth-only routes (no feature gate): /account, /account/2fa
+  // Auth-only routes (no feature gate): /home, /account, /account/2fa
   return NextResponse.next();
 }
 

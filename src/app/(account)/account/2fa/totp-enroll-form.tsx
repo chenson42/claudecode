@@ -9,12 +9,14 @@ interface TotpEnrollFormProps {
   uri: string;
   secret: string;
   pendingTtlMinutes: number;
+  callbackUrl?: string;
 }
 
 export function TotpEnrollForm({
   uri,
   secret,
   pendingTtlMinutes,
+  callbackUrl,
 }: TotpEnrollFormProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -76,10 +78,10 @@ export function TotpEnrollForm({
           </ul>
         </div>
         <a
-          href="/account/2fa"
+          href={callbackUrl ?? "/home"}
           className="mt-6 inline-block text-sm underline underline-offset-2"
         >
-          View 2FA settings
+          Continue
         </a>
       </div>
     );

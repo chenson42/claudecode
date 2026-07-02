@@ -40,7 +40,9 @@ vi.mock("@/lib/db/schema", () => ({
 }));
 
 // Import AFTER mocks are registered.
-import { checkRateLimit, getRequestIp, _inMemoryStore } from "./rate-limit";
+import { checkRateLimit, _inMemoryStore } from "./rate-limit";
+// getRequestIp moved to @/lib/request-ip (DECISION-017). Import from there.
+import { getRequestIp } from "@/lib/request-ip";
 
 // ---------------------------------------------------------------------------
 // Helpers

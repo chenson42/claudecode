@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth, signOut } from "@/auth";
+import { signOut } from "@/auth";
+import { cachedAuth } from "@/lib/auth/cached-auth";
 
 // NOTE: The 2FA gate is intentionally absent here. Users must be able to
 // reach /account/2fa to complete self-serve enrollment even when
@@ -11,7 +12,7 @@ export default async function AccountLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await cachedAuth();
   if (!session?.user) redirect("/signin?callbackUrl=/account");
 
   const nav = [
@@ -20,10 +21,10 @@ export default async function AccountLayout({
   ];
 
   return (
-    <div className="grid min-h-screen grid-cols-[220px_1fr]">
-      <aside className="border-r border-border bg-muted/40 p-4">
+    <div className="grid min-h-screen grid-cols-1 md:grid-cols-[220px_1fr]">
+      <aside className="border-b border-border bg-muted/40 p-4 md:border-b-0 md:border-r">
         <div className="mb-6">
-          <Link href="/" className="text-sm font-semibold">
+          <Link href="/home" className="text-sm font-semibold">
             ← Home
           </Link>
         </div>

@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, emailVerificationTokens, auditEvents } from "@/lib/db/schema";
 import { AUDIT_ACTIONS } from "@/lib/audit";
+import { isUniqueViolation } from "@/lib/db/errors";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 
@@ -60,26 +61,41 @@ export default async function VerifyEmailPage({ params }: Props) {
   const oldEmail = userRow.email;
   const newEmail = tokenRow.newEmail;
 
-  // Apply the email change atomically
-  await db.transaction(async (tx) => {
-    await tx
-      .update(users)
-      .set({ email: newEmail })
-      .where(eq(users.id, tokenRow.userId));
-
-    await tx
-      .delete(emailVerificationTokens)
-      .where(eq(emailVerificationTokens.id, tokenRow.id));
-
-    await tx.insert(auditEvents).values({
-      actorUserId: tokenRow.userId,
-      actorEmail: newEmail,
-      action: AUDIT_ACTIONS.USER_EMAIL_CHANGED,
-      resourceType: "user",
-      resourceId: tokenRow.userId,
-      metadata: { oldEmail, newEmail },
-    });
-  });
+  // Apply the email change atomically.
+  // The Neon HTTP driver has no interactive db.transaction(); db.batch()
+  // runs all three statements as a single server-side transaction.
+  // See docs/decisions.md DECISION-014.
+  //
+  // A 23505 unique-constraint violation can occur here if two users concurrently
+  // verify tokens that both target the same email address (TOCTOU on the
+  // requestEmailChange check). Catch it and return a friendly ErrorCard instead
+  // of an unhandled 500. Any other error is re-thrown.
+  try {
+    await db.batch([
+      db
+        .update(users)
+        .set({ email: newEmail })
+        .where(eq(users.id, tokenRow.userId)),
+      db
+        .delete(emailVerificationTokens)
+        .where(eq(emailVerificationTokens.id, tokenRow.id)),
+      db.insert(auditEvents).values({
+        actorUserId: tokenRow.userId,
+        actorEmail: newEmail,
+        action: AUDIT_ACTIONS.USER_EMAIL_CHANGED,
+        resourceType: "user",
+        resourceId: tokenRow.userId,
+        metadata: { oldEmail, newEmail },
+      }),
+    ] as unknown as Parameters<typeof db.batch>[0]);
+  } catch (err: unknown) {
+    if (isUniqueViolation(err)) {
+      return (
+        <ErrorCard message="This email address has already been claimed by another account. Request a new verification link from your account settings." />
+      );
+    }
+    throw err;
+  }
 
   revalidatePath("/account");
 

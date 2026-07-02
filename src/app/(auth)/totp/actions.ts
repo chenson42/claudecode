@@ -5,7 +5,6 @@ import { and, eq, isNull } from "drizzle-orm";
 import { auth, unstable_update } from "@/auth";
 import { db } from "@/lib/db";
 import {
-  auditEvents,
   userTotp,
   userTotpRecoveryCodes,
 } from "@/lib/db/schema";
@@ -15,38 +14,14 @@ import {
   normalizeRecoveryCode,
   verifyToken,
 } from "@/lib/two-factor";
-import { AUDIT_ACTIONS } from "@/lib/audit";
+import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { sanitizeCallbackUrl } from "@/lib/auth/safe-callback";
 
 function totpRedirectUrl(callbackUrl: string, error?: "invalid" | "rate_limited"): string {
   const params = new URLSearchParams({ callbackUrl });
   if (error) params.set("error", error);
   return `/totp?${params.toString()}`;
-}
-
-/**
- * Validates that a callbackUrl is a safe same-origin relative path.
- * Rejects protocol-relative URLs (starting with "//") and any absolute URL.
- * Defaults to /admin if the value is absent or invalid.
- */
-function sanitizeCallbackUrl(raw: string): string {
-  return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/admin";
-}
-
-async function logAttempt(
-  userId: string,
-  email: string | null | undefined,
-  action: string,
-  metadata: Record<string, unknown> = {},
-) {
-  await db.insert(auditEvents).values({
-    actorUserId: userId,
-    actorEmail: email,
-    action,
-    resourceType: "user",
-    resourceId: userId,
-    metadata,
-  });
 }
 
 export async function verifyTotpAction(formData: FormData) {
@@ -55,7 +30,7 @@ export async function verifyTotpAction(formData: FormData) {
 
   const rawInput = String(formData.get("token") ?? "");
   const callbackUrl = sanitizeCallbackUrl(
-    String(formData.get("callbackUrl") ?? "/admin"),
+    formData.get("callbackUrl") as string | null,
   );
 
   const enrollment = await db.query.userTotp.findFirst({
@@ -82,17 +57,31 @@ export async function verifyTotpAction(formData: FormData) {
   const trimmed = rawInput.trim();
   const isSixDigit = /^\d{6}$/.test(trimmed);
 
+  // Explicit actor: session is already resolved above; passing it avoids a
+  // second auth() call inside recordAudit() (Gap 5 resolution from Phase 1).
+  const actor = { userId: session.user.id, email: session.user.email ?? null };
+
   if (isSixDigit) {
     const ok = verifyToken(trimmed, decryptSecret(enrollment.secretCiphertext));
     if (!ok) {
-      await logAttempt(session.user.id, session.user.email, AUDIT_ACTIONS.TOTP_VERIFY_FAILED);
+      await recordAudit({
+        action: AUDIT_ACTIONS.TOTP_VERIFY_FAILED,
+        actor,
+        resourceType: "user",
+        resourceId: session.user.id,
+      });
       redirect(totpRedirectUrl(callbackUrl, "invalid"));
     }
     await db
       .update(userTotp)
       .set({ lastUsedAt: new Date() })
       .where(eq(userTotp.userId, session.user.id));
-    await logAttempt(session.user.id, session.user.email, AUDIT_ACTIONS.TOTP_VERIFY_SUCCEEDED);
+    await recordAudit({
+      action: AUDIT_ACTIONS.TOTP_VERIFY_SUCCEEDED,
+      actor,
+      resourceType: "user",
+      resourceId: session.user.id,
+    });
     await unstable_update({ user: { twoFactorVerified: true } });
     redirect(callbackUrl);
   }
@@ -100,8 +89,12 @@ export async function verifyTotpAction(formData: FormData) {
   // Try as recovery code.
   const normalized = normalizeRecoveryCode(trimmed);
   if (!normalized) {
-    await logAttempt(session.user.id, session.user.email, AUDIT_ACTIONS.TOTP_VERIFY_FAILED, {
-      reason: "malformed_input",
+    await recordAudit({
+      action: AUDIT_ACTIONS.TOTP_VERIFY_FAILED,
+      actor,
+      resourceType: "user",
+      resourceId: session.user.id,
+      metadata: { reason: "malformed_input" },
     });
     redirect(totpRedirectUrl(callbackUrl, "invalid"));
   }
@@ -114,15 +107,24 @@ export async function verifyTotpAction(formData: FormData) {
     ),
   });
   if (!match) {
-    await logAttempt(session.user.id, session.user.email, AUDIT_ACTIONS.TOTP_RECOVERY_FAILED);
+    await recordAudit({
+      action: AUDIT_ACTIONS.TOTP_RECOVERY_FAILED,
+      actor,
+      resourceType: "user",
+      resourceId: session.user.id,
+    });
     redirect(totpRedirectUrl(callbackUrl, "invalid"));
   }
   await db
     .update(userTotpRecoveryCodes)
     .set({ usedAt: new Date() })
     .where(eq(userTotpRecoveryCodes.id, match.id));
-  await logAttempt(session.user.id, session.user.email, AUDIT_ACTIONS.TOTP_RECOVERY_SUCCEEDED, {
-    codeId: match.id,
+  await recordAudit({
+    action: AUDIT_ACTIONS.TOTP_RECOVERY_SUCCEEDED,
+    actor,
+    resourceType: "user",
+    resourceId: session.user.id,
+    metadata: { codeId: match.id },
   });
   await unstable_update({ user: { twoFactorVerified: true } });
   redirect(callbackUrl);

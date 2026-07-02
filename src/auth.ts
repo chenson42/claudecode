@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import {
@@ -16,8 +16,21 @@ import {
   features,
 } from "@/lib/db/schema";
 import { authConfig } from "@/lib/auth/config";
+import { evaluateSignIn } from "@/lib/auth/sign-in-gate";
 import { ADMIN_ROLE, FEATURES, MEMBER_ROLE } from "@/lib/permissions";
-import { getRequestIp, checkRateLimit } from "@/lib/rate-limit";
+import { getRequestIp } from "@/lib/request-ip";
+import { checkRateLimit } from "@/lib/rate-limit";
+import {
+  checkLockout,
+  LOCKOUT_THRESHOLD,
+  LOCKOUT_DURATION_SECONDS,
+} from "@/lib/auth/lockout";
+import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
+import {
+  isLocalLoginEnabled,
+  computeEffectiveTwoFactor,
+} from "@/lib/auth/local-login";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 const INITIAL_ADMIN_EMAILS = (process.env.INITIAL_ADMIN_EMAILS ?? "")
   .split(",")
@@ -85,19 +98,41 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        // NextAuth 5 beta strips undeclared fields before authorize() is called.
+        // type: "hidden" suppresses this field in any auto-generated sign-in form.
+        turnstileToken: { label: "Turnstile Token", type: "hidden" },
       },
       async authorize(credentials, request) {
         const email = (credentials?.email as string | undefined)?.toLowerCase();
         const password = credentials?.password as string | undefined;
         if (!email || !password) return null;
 
-        // Rate limit: 5/min keyed by ip:email composite.
+        // Step 0: auth.local_login flag check — BEFORE rate limit so a
+        // disabled-flag rejection does not consume rate-limit budget on a
+        // permanently-blocked code path. Fail-open: missing row or DB error
+        // → allow credentials through (DECISION-026).
+        const localLoginEnabled = await isLocalLoginEnabled();
+        if (!localLoginEnabled) return null;
+
+        // Extract IP early — shared by step 0.5 (Turnstile) and step 1 (rate limit).
         // NextAuth 5 beta passes the original Request as the second arg.
-        // If headers are unavailable for any reason the key degrades to
-        // "signin:unknown:<email>" — still a meaningful per-email limit.
+        // If headers are unavailable the key degrades to "unknown" — still a
+        // meaningful per-email rate limit.
         const ip = getRequestIp(
           (request as Request | undefined)?.headers ?? new Headers(),
         );
+
+        // Step 0.5: Turnstile verification — BEFORE rate limit so bot traffic
+        // does not consume rate-limit budget. Fail-open when TURNSTILE_SECRET_KEY
+        // is unset (the starter default, DECISION-026). Surfaces to the user as
+        // CredentialsSignin — no leakage about why the check failed.
+        const turnstileOk = await verifyTurnstile(
+          credentials?.turnstileToken as string | undefined,
+          ip,
+        );
+        if (!turnstileOk) return null;
+
+        // Rate limit: 5/min keyed by ip:email composite.
         const limited = await checkRateLimit(
           `signin:${ip ?? "unknown"}:${email}`,
           { max: 5, windowSeconds: 60 },
@@ -110,8 +145,63 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         });
         if (!user?.password || !user.isActive) return null;
 
+        // Step 5: lockout check (credentials path only — see lockout.ts header).
+        // Returns null via the same code path as wrong-password to prevent enumeration.
+        const now = new Date();
+        const lockStatus = checkLockout(user, now);
+        if (lockStatus.locked) return null;
+
+        // Step 5b: lock window has expired — reset the counter before calling bcrypt
+        // so the user gets a fresh LOCKOUT_THRESHOLD window, not an immediate re-lock
+        // on the first failure after expiry (Gap 2 fix; see lockout.ts LockoutState.resetCounter).
+        if (lockStatus.resetCounter) {
+          await db
+            .update(users)
+            .set({ failedLoginAttempts: 0, lockedUntil: null })
+            .where(eq(users.id, user.id));
+        }
+
         const ok = await bcrypt.compare(password, user.password);
-        if (!ok) return null;
+
+        if (!ok) {
+          // Atomic conditional-increment. Single UPDATE avoids the SELECT-then-write
+          // race that could cause both the lock set and the audit event to double-fire
+          // under concurrent requests. See DECISION-025 and the Phase 3 design doc for
+          // full SQL semantics. Untyped sql`` (no generic) is intentional — the type
+          // parameter is unnecessary on .set() RHS expressions in Drizzle.
+          const [updated] = await db
+            .update(users)
+            .set({
+              failedLoginAttempts: sql`failed_login_attempts + 1`,
+              lockedUntil: sql`
+                CASE WHEN failed_login_attempts + 1 >= ${LOCKOUT_THRESHOLD}
+                  THEN now() + make_interval(secs => ${LOCKOUT_DURATION_SECONDS})
+                  ELSE locked_until
+                END
+              `,
+            })
+            .where(eq(users.id, user.id))
+            .returning({
+              failedLoginAttempts: users.failedLoginAttempts,
+              lockedUntil: users.lockedUntil,
+            });
+
+          // The account was not locked when we reached bcrypt (checkLockout above).
+          // Any non-null lockedUntil in RETURNING means the lock was set right now.
+          if (updated?.lockedUntil != null) {
+            void recordAudit({
+              action: AUDIT_ACTIONS.USER_ACCOUNT_LOCKED,
+              actor: { userId: user.id, email: user.email },
+              resourceType: "user",
+              resourceId: user.id,
+              metadata: {
+                failedAttempts: LOCKOUT_THRESHOLD,
+                lockedUntilEpochMs: updated.lockedUntil.getTime(),
+              },
+            });
+          }
+          return null;
+        }
 
         return {
           id: user.id,
@@ -124,17 +214,24 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async signIn({ user }) {
-      // Block sign-in if the user row is missing or inactive. Returning `true`
-      // on null would let a deleted user with a still-valid session re-create
-      // themselves through the adapter — a privilege bypass.
-      if (!user.id) return true; // brand-new OAuth user; adapter will create
-      const dbUser = await db.query.users.findFirst({
-        where: eq(users.id, user.id),
-        columns: { isActive: true },
-      });
-      if (!dbUser) return false;
-      return dbUser.isActive;
+    async signIn({ user, account }) {
+      // Delegate to the extracted gate so all branches are unit-testable.
+      // See src/lib/auth/sign-in-gate.ts and DECISION-015 for rationale:
+      //   - credentials → true unconditionally (authorize() already checked isActive)
+      //   - OAuth, no row → true (adapter will create the user row after this)
+      //   - OAuth, isActive=false → false (soft-deactivation block)
+      //   - OAuth, no email → false (fail-safe)
+      return evaluateSignIn(
+        account?.provider ?? "credentials",
+        user,
+        (email) =>
+          db.query.users
+            .findFirst({
+              where: eq(users.email, email),
+              columns: { isActive: true },
+            })
+            .then((row) => row ?? null),
+      );
     },
     // The `session` callback lives in the shared authConfig so the edge
     // runtime (proxy.ts) sees the same projection.
@@ -154,7 +251,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         await ensureDefaultRole(user.id, user.email ?? null);
         await db
           .update(users)
-          .set({ lastLoginAt: new Date() })
+          .set({ lastLoginAt: new Date(), failedLoginAttempts: 0, lockedUntil: null })
           .where(eq(users.id, user.id));
       }
 
@@ -194,7 +291,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         return {};
       }
       token.isActive = dbUser.isActive;
-      token.twoFactorRequired = dbUser.twoFactorRequired;
+      // Effective twoFactorRequired: raw column value AND the org-level
+      // auth.require_2fa master switch. Short-circuits when column is false
+      // (no flag read needed). Falls back to raw column on DB error so a DB
+      // blip does not accidentally ungate TOTP-required users. See DECISION-026.
+      token.twoFactorRequired = await computeEffectiveTwoFactor(
+        dbUser.twoFactorRequired,
+      );
       if (dbUser.email) token.email = dbUser.email;
 
       const needsRoleRefresh = !token.roles || trigger === "update" || !!user;

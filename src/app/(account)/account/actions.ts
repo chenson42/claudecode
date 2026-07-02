@@ -2,13 +2,13 @@
 
 import { randomBytes, createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, gt } from "drizzle-orm";
 import { compare, hash } from "bcryptjs";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { users, auditEvents, emailVerificationTokens, passwordResetTokens } from "@/lib/db/schema";
-import { AUDIT_ACTIONS } from "@/lib/audit";
-import { sendEmail } from "@/lib/email";
+import { users, emailVerificationTokens, passwordResetTokens } from "@/lib/db/schema";
+import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
+import { enqueueEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import type { ActionResult } from "@/types/actions";
 
@@ -36,9 +36,7 @@ export async function updateProfile(input: {
     .set({ name })
     .where(eq(users.id, session.user.id));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_PROFILE_UPDATED,
     resourceType: "user",
     resourceId: session.user.id,
@@ -113,6 +111,7 @@ export async function requestEmailChange(input: {
     where: and(
       eq(emailVerificationTokens.newEmail, newEmail),
       ne(emailVerificationTokens.userId, session.user.id),
+      gt(emailVerificationTokens.expiresAt, new Date()),
     ),
     columns: { id: true },
   });
@@ -145,7 +144,7 @@ export async function requestEmailChange(input: {
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const verifyUrl = `${baseUrl}/account/verify-email/${rawToken}`;
 
-  await sendEmail({
+  await enqueueEmail({
     to: newEmail,
     subject: "Confirm your new email address",
     html: `
@@ -156,11 +155,10 @@ export async function requestEmailChange(input: {
       <p>If you did not request this change, you can safely ignore this email.</p>
     `,
     text: `Confirm your email change: ${verifyUrl}\n\nExpires in 24 hours. If you did not request this, ignore this email.`,
+    templateKey: "email_change_verify",
   });
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_EMAIL_CHANGE_REQUESTED,
     resourceType: "user",
     resourceId: session.user.id,
@@ -183,9 +181,7 @@ export async function cancelEmailChange(): Promise<ActionResult> {
     .delete(emailVerificationTokens)
     .where(eq(emailVerificationTokens.userId, session.user.id));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_EMAIL_CHANGE_CANCELLED,
     resourceType: "user",
     resourceId: session.user.id,
@@ -242,9 +238,7 @@ export async function changePassword(input: {
     .delete(passwordResetTokens)
     .where(eq(passwordResetTokens.userId, session.user.id));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_PASSWORD_CHANGED,
     resourceType: "user",
     resourceId: session.user.id,
@@ -267,22 +261,28 @@ export async function requestAccountDeletion(): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Unauthorized." };
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.USER_DELETION_REQUESTED,
     resourceType: "user",
     resourceId: session.user.id,
     metadata: { stub: true },
   });
 
-  // TODO: Replace this stub with a real deletion flow. Two options:
-  //   1. Hard-delete cascade: capture actorEmail BEFORE delete, call
-  //      signOut(), then db.delete(users).where(eq(users.id, userId)).
-  //      auditEvents rows survive (actorUserId set null by cascade).
-  //   2. Soft-deactivation: set isActive=false, call signOut(). The proxy
-  //      already blocks deactivated users. Historical audit rows are preserved.
-  // Hard-delete vs soft-deactivate is a fork-specific choice.
+  // TODO: Replace this stub with a real deletion flow.
+  //
+  // CONSTRAINT (DECISION-015): the starter's signIn gate keys OAuth lookups off
+  // the user's email address. If a user row is hard-deleted, a deactivated user
+  // could re-register via Google OAuth (no row → adapter creates a fresh one).
+  // The mandated deletion strategy is therefore SOFT DEACTIVATION (isActive=false),
+  // NOT hard-delete. A hard-delete implementation must also add a `deleted_emails`
+  // blocklist (or equivalent) to preserve the OAuth re-registration block.
+  //
+  // Implementation shape for soft-deactivation:
+  //   await db.update(users).set({ isActive: false }).where(eq(users.id, userId));
+  //   await signOut({ redirect: false });
+  //
+  // The proxy already blocks deactivated users (isActive check on every request);
+  // the stale-JWT defense in the jwt callback evicts the token on next request.
 
   return {
     ok: true,

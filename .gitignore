@@ -27,5 +27,8 @@ deck/slides.html
 
 # Test output
 coverage/
-test-results/
+/test-results/
 playwright-report/
+
+# Playwright storageState — contains live session cookies; never commit
+e2e/support/.auth/

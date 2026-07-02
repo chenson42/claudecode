@@ -94,6 +94,8 @@ await db.delete(userRoles).where(eq(userRoles.userId, id));
 
 Validate every input before it reaches the database. Required fields, type correctness, length limits, allowed values. Return a clear `{ error: "..." }` message — do not leak internal errors or stack traces.
 
+**HTML-escape user-controlled strings before interpolating them into email HTML.** `src/lib/email.ts` sends HTML bodies — any user-supplied value (display name, subject line, reason text) interpolated directly into the template is an injection vector. Use a helper that escapes `<`, `>`, `&`, `"`, and `'`, or compose emails with a templating approach that separates data from markup. Lesson: westervillelions `2d3a2c5` — a user's display name with `<script>` in it rendered raw in a transactional email body.
+
 ### 4. Audit Events
 
 Any security-sensitive mutation (role change, feature flag toggle, 2FA enrolment/reset, user deactivation) writes to `audit_events`:

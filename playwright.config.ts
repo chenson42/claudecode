@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.resolve(__dirname, ".env.local") });
 
 export default defineConfig({
+  globalSetup: "./e2e/support/global-setup.ts",
   testDir: "./e2e",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,

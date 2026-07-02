@@ -28,6 +28,26 @@ export default async function AdminDashboard() {
       blurb: "What shipped, when.",
     },
     {
+      href: "/admin/feedback",
+      title: "Feedback",
+      blurb: "Review member suggestions and bug reports.",
+    },
+    {
+      href: "/admin/audit",
+      title: "Audit log",
+      blurb: "Security events, sign-ins, and flag changes.",
+    },
+    {
+      href: "/admin/email-queue",
+      title: "Email queue",
+      blurb: "Monitor outbound email and retry failed sends.",
+    },
+    {
+      href: "/admin/whats-new",
+      title: "What's new",
+      blurb: "Publish updates for members to see on their home page.",
+    },
+    {
       href: "/admin/2fa",
       title: "Your 2FA",
       blurb: "Enroll or rotate your authenticator.",

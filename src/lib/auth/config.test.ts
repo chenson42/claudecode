@@ -1,7 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { Session } from "next-auth";
 import type { JWT } from "next-auth/jwt";
+
+// Stub next-auth so importing authConfig from ./config does not trigger the
+// NextAuth() runtime initialisation (which imports next/server and is
+// incompatible with the Vitest node environment).
+vi.mock("next-auth", () => ({
+  default: vi.fn(() => ({ auth: vi.fn() })),
+}));
+
 import { projectJWTOntoSession } from "./session-projection";
+import { authConfig } from "./config";
 
 /**
  * Guards against a regression where the `session` callback was accidentally
@@ -59,5 +68,11 @@ describe("projectJWTOntoSession", () => {
 
     expect((result.user as { id?: string }).id).toBeUndefined();
     expect((result.user as { roles?: string[] }).roles).toBeUndefined();
+  });
+});
+
+describe("authConfig shape", () => {
+  it("includes trustHost: true so OAuth callbacks work behind non-Vercel proxies", () => {
+    expect(authConfig.trustHost).toBe(true);
   });
 });

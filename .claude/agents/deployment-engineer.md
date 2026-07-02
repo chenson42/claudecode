@@ -94,6 +94,16 @@ Per-fork additions (analytics, alternative mail providers, etc.) — document th
 
 **OAuth callback mismatch:** the Google OAuth client must list `${AUTH_URL}/api/auth/callback/google` as an authorized redirect URI.
 
+## External-System Failures — Get Ground Truth Before Touching Git
+
+A deploy/CI failure that appears after a push does not always mean the code is wrong — especially when the *same commit and author* suddenly produces a *different result*. When that happens, the external system's state changed, not your code.
+
+**Do not amend, re-author, or force-push to chase an external-system failure.** Open the failing service's dashboard and read the actual error before touching git history. Common signatures:
+- Vercel rejects a deploy that would otherwise build cleanly (check the "Commit Author / GitHub User / Vercel Account" fields in the deployment detail panel — a duplicate Vercel account linked to the same GitHub login can block attribution even though the code is fine; fix by reconnecting the GitHub identity on the correct account, not by rewriting commits).
+- CI green locally, red in the pipeline (check for environment-variable drift, runner image updates, or a flaky third-party integration in the CI log before assuming a code regression).
+
+Force-pushing or amending to diagnose an external-system problem erases the diagnostic baseline, makes the real cause harder to find, and may break downstream branches. Identify the root cause first; change git history last (and only if the root cause actually requires it).
+
 ## Ownership
 
 - **30-day dependencies review.** Monthly review of `npm outdated` and `npm audit`. Triage CVEs, plan major-version upgrades, retire dead packages. Log the outcome in `docs/reviews/log.md` and write the detail file at `docs/reviews/YYYY-MM-DD-dependencies.md` for substantial passes.

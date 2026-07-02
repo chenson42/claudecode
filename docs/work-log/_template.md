@@ -6,6 +6,8 @@
 > **Flag(s):** [new key, or "not needed"]
 > **Estimated complexity:** [small | medium | large]
 > **Pipeline mode:** [Full | Accelerated — Phase 2 skipped (rationale) | Bug-fix variant]
+> **Source — member feedback:** `feedback-row-id: <UUID>` — member said: "[verbatim quote]"
+> *(omit this block entirely if the work did not originate from in-app feedback)*
 
 ---
 

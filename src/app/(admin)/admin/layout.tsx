@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth, signOut } from "@/auth";
+import { signOut } from "@/auth";
+import { cachedAuth } from "@/lib/auth/cached-auth";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await cachedAuth();
   if (!session?.user) redirect("/signin?callbackUrl=/admin");
   if (session.user.twoFactorRequired && !session.user.twoFactorVerified) {
     redirect("/totp?callbackUrl=/admin");
@@ -18,12 +19,15 @@ export default async function AdminLayout({
     { href: "/admin/users", label: "Users" },
     { href: "/admin/flags", label: "Feature flags" },
     { href: "/admin/docs", label: "Release notes" },
+    { href: "/admin/audit", label: "Audit Log" },
+    { href: "/admin/email-queue", label: "Email queue" },
+    { href: "/admin/whats-new", label: "What's new" },
     { href: "/admin/2fa", label: "Your 2FA" },
   ];
 
   return (
-    <div className="grid min-h-screen grid-cols-[220px_1fr]">
-      <aside className="border-r border-border bg-muted/40 p-4">
+    <div className="grid min-h-screen grid-cols-1 md:grid-cols-[220px_1fr]">
+      <aside className="border-b border-border bg-muted/40 p-4 md:border-b-0 md:border-r">
         <div className="mb-6">
           <Link href="/" className="text-sm font-semibold">
             ← Claude Code Starter

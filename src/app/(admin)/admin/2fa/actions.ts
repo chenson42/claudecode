@@ -7,7 +7,6 @@ import { eq } from "drizzle-orm";
 import { auth, unstable_update } from "@/auth";
 import { db } from "@/lib/db";
 import {
-  auditEvents,
   userTotp,
   userTotpPendingEnrollments,
   userTotpRecoveryCodes,
@@ -19,7 +18,7 @@ import {
   hashRecoveryCode,
   verifyToken,
 } from "@/lib/two-factor";
-import { AUDIT_ACTIONS } from "@/lib/audit";
+import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
 
 const FRESH_COOKIE_TTL_SECONDS = 300; // 5 minutes — enough to copy/paste
 
@@ -46,6 +45,21 @@ async function replaceRecoveryCodes(userId: string): Promise<string[]> {
     })),
   );
   return codes;
+}
+
+// ---------------------------------------------------------------------------
+// clearFreshCodesCookieAction — called by the FreshRecoveryCodes client island
+// after it mounts and the codes are visible to the user. Running the delete
+// here (in a server action) is the only way to mutate cookies legally in
+// Next 16; doing it in an RSC render was the source of BUG-2.
+// ---------------------------------------------------------------------------
+
+export async function clearFreshCodesCookieAction() {
+  const jar = await cookies();
+  // Path must match the path used when the cookie was SET in setFreshRecoveryCodesCookie.
+  // A deletion sent without the matching Path attribute targets a different cookie
+  // entry in the browser jar and silently fails.
+  jar.delete({ name: FRESH_RECOVERY_CODES_COOKIE, path: "/admin/2fa" });
 }
 
 export async function confirmEnrollmentAction(formData: FormData) {
@@ -96,9 +110,7 @@ export async function confirmEnrollmentAction(formData: FormData) {
   const freshCodes = await replaceRecoveryCodes(session.user.id);
   await setFreshRecoveryCodesCookie(freshCodes);
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.TOTP_ENROLLED,
     resourceType: "user",
     resourceId: session.user.id,
@@ -123,9 +135,7 @@ export async function regenerateRecoveryCodesAction() {
   const freshCodes = await replaceRecoveryCodes(session.user.id);
   await setFreshRecoveryCodesCookie(freshCodes);
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.TOTP_RECOVERY_CODES_REGENERATED,
     resourceType: "user",
     resourceId: session.user.id,
@@ -147,9 +157,7 @@ export async function resetEnrollmentAction() {
     .delete(userTotpPendingEnrollments)
     .where(eq(userTotpPendingEnrollments.userId, session.user.id));
 
-  await db.insert(auditEvents).values({
-    actorUserId: session.user.id,
-    actorEmail: session.user.email,
+  await recordAudit({
     action: AUDIT_ACTIONS.TOTP_RESET,
     resourceType: "user",
     resourceId: session.user.id,

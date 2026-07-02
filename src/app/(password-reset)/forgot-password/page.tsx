@@ -4,21 +4,28 @@ import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { requestPasswordReset } from "../actions";
+import { Turnstile } from "@/components/shared/turnstile";
+
+const siteKeySet = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const result = await requestPasswordReset({ email: email.trim() });
+      const result = await requestPasswordReset({
+        email: email.trim(),
+        turnstileToken: turnstileToken || undefined,
+      });
       if (!result.ok) {
-        // Server actions from this flow always return ok:true, but handle
-        // defensively in case a future validation is added.
         toast.error(result.error);
+        // Reset token so the widget refires a new challenge before the next attempt.
+        setTurnstileToken("");
       } else {
         setIsSuccess(true);
       }
@@ -87,9 +94,14 @@ export default function ForgotPasswordPage() {
             placeholder="you@example.com"
           />
         </div>
+        <Turnstile
+          onVerify={setTurnstileToken}
+          onExpire={() => setTurnstileToken("")}
+          onError={() => setTurnstileToken("")}
+        />
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || (siteKeySet && !turnstileToken)}
           className="w-full rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-60"
         >
           {isSubmitting ? "Sending…" : "Send reset link"}

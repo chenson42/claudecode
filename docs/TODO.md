@@ -1,0 +1,63 @@
+# TODO — Backlog & Follow-Ups
+
+The single aggregation point for open work. Work-logs track *how* a piece of work
+moves through the pipeline; this file tracks *what's open* across everything.
+
+**Reconciliation rule (Workflow Rule 10):** any commit that ships, defers, or
+discovers work must update this file *in the same commit*. Phase 6 follow-ups
+land here. Review punch-list items that get accepted land here. Shipped items
+move to Done with the date. Claude reads this file at session start alongside
+the cadence check.
+
+Format: one line per item — `- [ ] <item> — <source/link>`. Keep it lean;
+detail lives in the linked doc, not here.
+
+---
+
+## In Flight
+
+- [ ] `/test` + `/test-results` skills port — in progress (doc-only)
+- [ ] Push `feat/post-login-routing-and-e2e` (2 commits ready, awaiting `/pre-push` + user push) and open the PR
+
+## Next Up
+
+## Backlog
+
+- [ ] Stale test replica: (auth)/totp/actions.test.ts tests a local copy of the pre-extraction sanitizeCallbackUrl (old /admin fallback) — retire or point at safe-callback.test.ts coverage
+
+- [ ] Admin lock-state detail page — add lock badge + unlock action to `/admin/users/[id]` — follow-up from `docs/work-log/2026-07-02-admin-lock-visibility.md` Phase 3 scope decision
+- [ ] `(password-reset)` error boundary — same gap as `(email-verify)`; unauthenticated token-lookup route, no error.tsx — tracked from `docs/work-log/2026-07-02-email-verify-error-boundary.md` Phase 1 Pass 5
+- [ ] Tier 4 utilities on demand (csvCellSafe, ssrf-guard, magic-bytes, maskEmail, settings store, ConfirmDialog, iconKey nav, cf-connecting-ip, route-table 2FA gate, …) — harvest Tier 4
+- [ ] TOTP enrolment e2e — requires either a seeded deterministic TOTP secret (security risk — see routing feature option (c) rationale, e2e-auth-infra work-log Phase 2 Ruling 7) or external authenticator integration; deferred until a safe pattern is designed
+
+## Done
+
+- [x] 2026-07-02 — E2E feedback test-data cleanup — globalSetup preflight sweep scoped to seed-user emails; 9 stale rows swept on first run — SHIP IT — `docs/work-log/2026-07-02-e2e-feedback-cleanup.md`
+- [x] 2026-07-02 — `(email-verify)` error boundary — `error.tsx` added at group level; ui-standards.md rule written — SHIP IT — `docs/work-log/2026-07-02-email-verify-error-boundary.md`
+- [x] 2026-07-02 — TOTP enrollment-stranding fix — two-hop redirect chain (proxy → /totp → /account/2fa?callbackUrl=) implemented; "Continue" CTA; auth e2e gate cleared 48/48 — SHIP IT — `docs/work-log/2026-07-02-totp-enrollment-redirect.md`
+- [x] 2026-07-02 — Admin lock-state visibility + unlock — amber badge + inline unlock form; `USER_ACCOUNT_UNLOCKED` audit event; check:audit passes — SHIP IT — `docs/work-log/2026-07-02-admin-lock-visibility.md`
+- [x] 2026-07-02 — Turnstile CAPTCHA (no-op until keyed) — endpoint-level verification in authorize(); fail-open; CSP updated; 48/48 e2e with no keys — SHIP IT — `docs/work-log/2026-07-02-turnstile-captcha.md`
+- [x] 2026-07-02 — Email queue admin viewer + Resend delivery webhook — migration 0006; hand-rolled HMAC (3 Phase 2 mandates); /admin/email-queue viewer + retry; 48/48 e2e — SHIP IT — `docs/work-log/2026-07-02-email-observability.md`
+- [x] 2026-07-02 — Member-visible what's-new — migration 0007; validateWhatsNewEntry (HTML-reject, spread emoji check); admin CRUD; member /home card + /whats-new; Rule 13 advisory; 48/48 e2e — SHIP IT — `docs/work-log/2026-07-02-whats-new.md`
+- [x] 2026-07-02 — Audit log viewer at `/admin/audit` — pure RSC; input guards with 13 unit tests; grouped action select; admin.audit permission; SOC 2 fork note; 48/48 e2e — SHIP IT — `docs/work-log/2026-07-02-audit-log-viewer.md`
+- [x] 2026-07-01 — Process batch: `docs/ui-standards.md`, `downstream-sync` skill, QA feature-gate table + no-self-agreeing-mocks, force-push guardrail (Rule 11 + deployment-engineer), `/pre-push` CVE step, database-admin `onDelete` rule, api-developer email-escape rule, TODO ledger (Rule 10) — harvest Tier 3 #16-20, #23 (instructions)
+- [x] 2026-07-01 — BUG-1: verify-email `db.transaction()` on neon-http → `db.batch()` — SHIP IT — `docs/work-log/2026-07-01-verify-email-neon-http-transaction.md`
+- [x] 2026-07-01 — BUG-2: 2FA fresh-recovery-codes cookie deleted during RSC render — SHIP IT — `docs/work-log/2026-07-01-2fa-fresh-codes-rsc-cookie.md`
+- [x] 2026-07-01 — BUG-3: first-time Google OAuth sign-in gets AccessDenied — SHIP IT — `docs/work-log/2026-07-01-oauth-first-signin-accessdenied.md`
+- [x] 2026-07-01 — BUG-4: NextAuth `trustHost` unset — OAuth hard-blocked off-Vercel — SHIP IT — `docs/work-log/2026-07-01-nextauth-trusthost.md`
+- [x] 2026-07-01 — Post-login routing + member home + global nav + e2e hardening — SHIP IT, committed `18f04a7`
+- [x] 2026-07-01 — Sibling harvest of 7 fork repos → classified punch-list — committed `4c54e4f`
+- [x] 2026-07-01 — recordAudit() helper (audit ip/user_agent, request-ip.ts shared module, logAttempt elimination) — SHIP IT — `docs/work-log/2026-07-01-record-audit-helper.md`
+- [x] 2026-07-01 — isUniqueViolation() helper (verify-email ErrorCard, password-reset atomic upsert) — SHIP IT — `docs/work-log/2026-07-01-unique-violation-helper.md`
+- [x] 2026-07-02 — Mobile (360px) visual pass — account+admin sidebar layout, global nav crowding — CSS-only, batch QA covers regression — `docs/work-log/2026-07-02-mobile-360-pass.md`
+- [x] 2026-07-01 — E2E auth infra (cached storageState, role boundaries, DB isolation guard) — SHIP IT — `docs/work-log/2026-07-01-e2e-auth-infra.md`
+- [x] 2026-07-01 — Durable email queue with retry (persist-first enqueue, cron worker, vercel.json) — SHIP IT — `docs/work-log/2026-07-01-email-queue.md`
+- [x] 2026-07-01 — In-app feedback + dev-loop triage wiring — SHIP WITH NOTES (FU-1: e2e test-data hygiene) — `docs/work-log/2026-07-01-feedback-dev-loop.md`
+- [x] 2026-07-01 — Report-only CSP + HSTS preload removal — SHIP IT — `docs/work-log/2026-07-01-security-headers.md`
+- [x] 2026-07-01 — ACCESS_DENIED audit event on /access-pending bounce — SHIP IT — `docs/work-log/2026-07-01-access-denied-audit.md`
+- [x] 2026-07-01 — Per-account login lockout (5-failure → 15-min DB-persisted lock, npvitals bug fix, Gap 2–4 fixes) — SHIP IT — `docs/work-log/2026-07-01-account-lockout.md`
+- [x] 2026-07-01 — pendingTaken expiresAt-filter bug (requestEmailChange cross-user collision check) — SHIP IT — `docs/work-log/2026-07-01-pending-email-expiry-filter.md`
+- [x] 2026-07-01 — check:sql-date tripwire (catch sql<Date> compile-time lie; umbrella check script; pre-push Step 3c) — SHIP IT — `docs/work-log/2026-07-01-sql-date-tripwire.md`
+- [x] 2026-07-01 — Opportunistic expired-token GC (daily /api/cron/maintenance; passwordResetTokens + emailVerificationTokens + userTotpPendingEnrollments) — SHIP IT — `docs/work-log/2026-07-01-token-gc.md`
+- [x] 2026-07-01 — cache()-wrap isFlagEnabled + cachedAuth (Scope 1+2; eliminates 2× Tier-A SELECT per request; corrects false framework comment) — SHIP IT — `docs/work-log/2026-07-01-flag-caching.md`
+- [x] 2026-07-01 — auth.local_login + auth.require_2fa admin flags (OAuth-only endpoint gate, org 2FA master switch, fail-open postures, e2e green) — SHIP IT — `docs/work-log/2026-07-01-auth-mode-flags.md`
