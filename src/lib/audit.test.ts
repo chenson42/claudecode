@@ -96,6 +96,12 @@ const EXPECTED_ENTRIES: Record<keyof typeof AUDIT_ACTIONS, string> = {
   ACCESS_DENIED: "access.denied",
   // Account lockout — written from src/auth.ts authorize(), not from actions.ts
   USER_ACCOUNT_LOCKED: "user.account_locked",
+  // Admin-initiated account unlock — written from src/app/(admin)/admin/users/actions.ts
+  USER_ACCOUNT_UNLOCKED: "user.account_unlocked",
+  // What's-new entries — written from src/app/(admin)/admin/whats-new/actions.ts
+  WHATS_NEW_ENTRY_CREATED: "whats_new.entry_created",
+  WHATS_NEW_ENTRY_UPDATED: "whats_new.entry_updated",
+  WHATS_NEW_ENTRY_DELETED: "whats_new.entry_deleted",
 };
 
 const EXPECTED_COUNT = Object.keys(EXPECTED_ENTRIES).length;

@@ -54,6 +54,13 @@ export const AUDIT_ACTIONS = {
   // (not an actions.ts file, so not covered by the check:audit tripwire —
   // intentional, same pattern as RATE_LIMIT_BLOCKED and EMAIL_QUEUE_PERMANENT_FAILURE).
   USER_ACCOUNT_LOCKED: "user.account_locked",
+  // Admin-initiated account unlock — written from src/app/(admin)/admin/users/actions.ts.
+  // The check:audit tripwire scans that file and requires the AUDIT_ACTIONS reference.
+  USER_ACCOUNT_UNLOCKED: "user.account_unlocked",
+  // What's-new entries — written from src/app/(admin)/admin/whats-new/actions.ts.
+  WHATS_NEW_ENTRY_CREATED: "whats_new.entry_created",
+  WHATS_NEW_ENTRY_UPDATED: "whats_new.entry_updated",
+  WHATS_NEW_ENTRY_DELETED: "whats_new.entry_deleted",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

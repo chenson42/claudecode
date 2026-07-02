@@ -1,10 +1,14 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { cachedAuth } from "@/lib/auth/cached-auth";
 import { db } from "@/lib/db";
-import { feedbackPromptState } from "@/lib/db/schema";
+import { feedbackPromptState, whatsNewEntries } from "@/lib/db/schema";
 import { FEATURES } from "@/lib/permissions";
+import { FormattedDate } from "@/components/shared/formatted-date";
 import { FeedbackPromptCard } from "./feedback-prompt-card";
+
+// Number of What's-new entries shown in the home card.
+const WHATS_NEW_HOME_LIMIT = 3;
 
 // Server-side computation: should the daily feedback prompt card be shown?
 // Uses UTC "today" for the comparison (known write-local/read-UTC imprecision — see DECISION-023).
@@ -43,6 +47,19 @@ export default async function HomePage() {
     columns: { optedOut: true, lastSnoozedDate: true, lastSubmittedDate: true },
   });
   const showFeedbackPrompt = shouldShowFeedbackPrompt(promptState ?? null);
+
+  // What's-new entries — latest WHATS_NEW_HOME_LIMIT only; zero entries → card hidden.
+  const recentWhatsNew = await db
+    .select({
+      id: whatsNewEntries.id,
+      emoji: whatsNewEntries.emoji,
+      title: whatsNewEntries.title,
+      body: whatsNewEntries.body,
+      publishedAt: whatsNewEntries.publishedAt,
+    })
+    .from(whatsNewEntries)
+    .orderBy(desc(whatsNewEntries.publishedAt))
+    .limit(WHATS_NEW_HOME_LIMIT);
 
   return (
     <>
@@ -106,6 +123,34 @@ export default async function HomePage() {
           )}
         </div>
       </section>
+
+      {/* What's-new card — hidden when zero entries; shown above feedback card */}
+      {recentWhatsNew.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            What&apos;s new
+          </h2>
+          <ul className="mt-3 space-y-3">
+            {recentWhatsNew.map((entry) => (
+              <li key={entry.id} className="text-sm">
+                {/* XSS invariant: all content rendered as JSX text nodes */}
+                {entry.emoji && <span className="mr-1">{entry.emoji}</span>}
+                <span className="font-medium">{entry.title}</span>
+                <p className="mt-0.5 text-muted-foreground">{entry.body}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  <FormattedDate value={entry.publishedAt} mode="date" />
+                </p>
+              </li>
+            ))}
+          </ul>
+          <Link
+            href="/whats-new"
+            className="mt-3 inline-block text-xs text-muted-foreground hover:text-foreground"
+          >
+            See all →
+          </Link>
+        </section>
+      )}
 
       {/* Daily feedback prompt card — suppressed after snooze/submit/opt-out for today */}
       {showFeedbackPrompt && (

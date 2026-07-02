@@ -6,6 +6,76 @@ import { AUDIT_ACTIONS } from "@/lib/audit";
 import { sql, and, eq, lt } from "drizzle-orm";
 import { sendEmail } from "./send";
 
+// ----- recordDeliveryEvent -------------------------------------------------
+// Called by POST /api/webhooks/resend to backfill delivery-status timestamps
+// onto queue rows matched by providerMessageId (see DECISION-028).
+// The webhook handler owns HTTP semantics; this function owns the DB write.
+
+export type DeliveryEventType =
+  | "email.delivered"
+  | "email.opened"
+  | "email.clicked"
+  | "email.bounced"
+  | "email.complained";
+
+export async function recordDeliveryEvent(
+  providerMessageId: string,
+  eventType: DeliveryEventType,
+  opts?: { occurredAt?: Date; failureReason?: string },
+): Promise<{ matched: boolean }> {
+  const ts = opts?.occurredAt ?? new Date();
+  const cond = eq(emailQueue.providerMessageId, providerMessageId);
+
+  let returned: { id: string }[] | undefined;
+
+  switch (eventType) {
+    case "email.delivered":
+      returned = await db
+        .update(emailQueue)
+        .set({ deliveredAt: ts })
+        .where(cond)
+        .returning({ id: emailQueue.id });
+      break;
+    case "email.opened":
+      returned = await db
+        .update(emailQueue)
+        .set({ openedAt: ts })
+        .where(cond)
+        .returning({ id: emailQueue.id });
+      break;
+    case "email.clicked":
+      returned = await db
+        .update(emailQueue)
+        .set({ clickedAt: ts })
+        .where(cond)
+        .returning({ id: emailQueue.id });
+      break;
+    case "email.bounced":
+      returned = await db
+        .update(emailQueue)
+        .set({
+          bouncedAt: ts,
+          ...(opts?.failureReason ? { failureReason: opts.failureReason } : {}),
+        })
+        .where(cond)
+        .returning({ id: emailQueue.id });
+      break;
+    case "email.complained":
+      returned = await db
+        .update(emailQueue)
+        .set({ complainedAt: ts })
+        .where(cond)
+        .returning({ id: emailQueue.id });
+      break;
+    default: {
+      const _exhaustive: never = eventType;
+      throw new Error(`Unknown delivery event type: ${String(_exhaustive)}`);
+    }
+  }
+
+  return { matched: (returned ?? []).length > 0 };
+}
+
 // ----- Types ---------------------------------------------------------------
 
 export type EnqueueEmailInput = {
@@ -51,6 +121,12 @@ type RawQueueRow = {
   sent_at: string | null;
   provider_message_id: string | null;
   failure_reason: string | null;
+  // Delivery-event timestamps written by the Resend webhook handler.
+  delivered_at: string | null;
+  opened_at: string | null;
+  clicked_at: string | null;
+  bounced_at: string | null;
+  complained_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -73,6 +149,11 @@ function fromRaw(raw: RawQueueRow): typeof emailQueue.$inferSelect {
     sentAt: raw.sent_at ? new Date(raw.sent_at) : null,
     providerMessageId: raw.provider_message_id,
     failureReason: raw.failure_reason,
+    deliveredAt: raw.delivered_at ? new Date(raw.delivered_at) : null,
+    openedAt: raw.opened_at ? new Date(raw.opened_at) : null,
+    clickedAt: raw.clicked_at ? new Date(raw.clicked_at) : null,
+    bouncedAt: raw.bounced_at ? new Date(raw.bounced_at) : null,
+    complainedAt: raw.complained_at ? new Date(raw.complained_at) : null,
     createdAt: new Date(raw.created_at),
     updatedAt: new Date(raw.updated_at),
   };

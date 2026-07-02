@@ -12,6 +12,9 @@ export const FEATURES = {
   ADMIN_FLAGS: "admin.flags",
   ADMIN_RELEASE_NOTES: "admin.release_notes",
   ADMIN_FEEDBACK: "admin.feedback",
+  ADMIN_AUDIT: "admin.audit",
+  ADMIN_EMAIL_QUEUE: "admin.email_queue",
+  ADMIN_WHATS_NEW: "admin.whats_new",
 } as const;
 
 export type FeatureKey = (typeof FEATURES)[keyof typeof FEATURES];
@@ -50,6 +53,24 @@ export const FEATURE_CATALOG: Array<{
     key: FEATURES.ADMIN_FEEDBACK,
     name: "Manage feedback",
     description: "View and triage member feedback submissions at /admin/feedback.",
+    category: "admin",
+  },
+  {
+    key: FEATURES.ADMIN_AUDIT,
+    name: "View audit log",
+    description: "Read the security audit log at /admin/audit.",
+    category: "admin",
+  },
+  {
+    key: FEATURES.ADMIN_EMAIL_QUEUE,
+    name: "Email queue",
+    description: "View the outbound email queue and retry failed sends.",
+    category: "admin",
+  },
+  {
+    key: FEATURES.ADMIN_WHATS_NEW,
+    name: "What's new",
+    description: "Create, edit, and delete What's new entries visible to members.",
     category: "admin",
   },
 ];

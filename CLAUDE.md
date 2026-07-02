@@ -66,9 +66,11 @@ src/
 │   ├── (account)/account/          — Self-serve account page (profile, email, password, delete)
 │   │   └── 2fa/                    — Per-user TOTP enrollment + management
 │   ├── (admin)/admin/              — Admin shell (users, flags, docs, 2fa subpages)
-│   │   └── feedback/               — Admin feedback triage page, status control, actions
+│   │   ├── feedback/               — Admin feedback triage page, status control, actions
+│   │   └── whats-new/              — Admin CRUD for What's-new entries (list+create, edit, delete)
 │   ├── (member)/home/              — Post-login member home (greeting, roles, features, global nav)
 │   │   └── feedback-prompt-card.tsx  — Daily prompt card (client island)
+│   ├── (member)/whats-new/         — Member full What's-new list (all entries, newest-first)
 │   ├── (member)/feedback/          — Member server actions (submit, snooze, opt-out)
 │   ├── (auth)/signin/              — Sign-in (Google OAuth)
 │   ├── (auth)/totp/                — TOTP enrolment + verification
@@ -314,6 +316,7 @@ Slugs are short, lowercase, hyphenated, and stable. Don't rename them after the 
 10. **Keep `docs/TODO.md` reconciled in the same commit as the work.** It is the single backlog aggregator. Shipping something? Move its line to Done (with date) in that commit. Deferring something, discovering a follow-up, or accepting a review punch-list item? Add a line in that commit. Phase 6 `SHIP WITH NOTES` follow-ups land here, not just in the work-log. A commit that changes what's open without touching `docs/TODO.md` is incomplete — `/pre-push` flags it.
 11. **Never amend or force-push to diagnose an external-system failure.** When the same commit suddenly yields a different deploy or CI result, the external system changed — not your code. Get ground truth from the failing service's dashboard before touching git history. Re-authoring commits fixes nothing when the cause is a Vercel account issue, a CI runner update, or a third-party integration outage.
 12. **Mark feedback rows at delivery.** When a Phase 6 analyst closes a feature that originated from in-app member feedback, update the `feedback` row status from `triaged` to `done` at Phase 6 close. The work-log's Source block (see the template) records the row UUID so it can be found. Do not mark `done` before Phase 6 — the row stays `triaged` while the feature is in flight.
+13. **What's-new advisory at SHIP IT.** At Phase 6, if the shipped feature introduces member-visible behavior, consider publishing a `whats_new_entries` entry to announce it (admin CRUD at `/admin/whats-new`). Not required for internal admin tooling, infrastructure changes, or bug fixes.
 
 ## Commit Message Standards
 

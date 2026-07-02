@@ -317,7 +317,17 @@ export const emailQueue = pgTable(
     // Resend message ID on successful send; 'dev-intercepted:<uuid>' in dev mode.
     providerMessageId: text("provider_message_id"),
     // Last error message from Resend on failure. Overwritten on each attempt.
+    // Also set on bounce events from the Resend webhook (see deliveredAt below).
     failureReason: text("failure_reason"),
+    // Delivery-event timestamps from Resend webhook (via POST /api/webhooks/resend).
+    // All nullable: NULL = event not yet received or webhook not configured.
+    // 'dev-intercepted:*' providerMessageId rows never receive these (Resend never
+    // sees the email); webhook updates on those rows silently find no match.
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    clickedAt: timestamp("clicked_at", { withTimezone: true }),
+    bouncedAt: timestamp("bounced_at", { withTimezone: true }),
+    complainedAt: timestamp("complained_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -331,6 +341,8 @@ export const emailQueue = pgTable(
     index("ix_email_queue_status_next").on(t.status, t.nextAttemptAt),
     // Lease-recovery query: WHERE status='processing' AND lastAttemptAt < now()-10min
     index("ix_email_queue_status_last").on(t.status, t.lastAttemptAt),
+    // Webhook UPDATE path: WHERE provider_message_id = $1 (one lookup per event).
+    index("ix_email_queue_provider_message_id").on(t.providerMessageId),
   ],
 );
 
@@ -391,6 +403,39 @@ export const feedbackPromptState = pgTable("feedback_prompt_state", {
   // Last date member submitted feedback. Compared with UTC today for suppression.
   lastSubmittedDate: text("last_submitted_date"),
 });
+
+// What's new entries — admin-published announcements shown to members on /home and /whats-new.
+// Body is plain text only; validated server-side (HTML rejected, not stripped).
+// publishedAt is set on INSERT only; UPDATE actions must never touch this column
+// so that edits don't resurface old entries as "new" in the list ordering.
+
+export const whatsNewEntries = pgTable(
+  "whats_new_entries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    // Optional; ≤2 Unicode code points validated via [...emoji].length server-side.
+    emoji: text("emoji"),
+    title: text("title").notNull(), // ≤100 chars, plain text, validated server-side
+    body: text("body").notNull(), // ≤500 chars, plain text, validated server-side
+    publishedAt: timestamp("published_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(), // set on INSERT only; UPDATE actions MUST NOT include this column
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()), // per $onUpdate convention (users, emailQueue)
+    updatedBy: uuid("updated_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => [
+    // Hot-path query: member home card and /whats-new list both ORDER BY published_at DESC.
+    index("ix_whats_new_published").on(t.publishedAt.desc()),
+  ],
+);
 
 // Relations
 
@@ -458,6 +503,20 @@ export const feedbackPromptStateRelations = relations(
   ({ one }) => ({
     user: one(users, {
       fields: [feedbackPromptState.userId],
+      references: [users.id],
+    }),
+  }),
+);
+
+export const whatsNewEntriesRelations = relations(
+  whatsNewEntries,
+  ({ one }) => ({
+    creator: one(users, {
+      fields: [whatsNewEntries.createdBy],
+      references: [users.id],
+    }),
+    updater: one(users, {
+      fields: [whatsNewEntries.updatedBy],
       references: [users.id],
     }),
   }),

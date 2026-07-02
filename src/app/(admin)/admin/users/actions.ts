@@ -154,3 +154,33 @@ export async function reactivateUser(input: {
   revalidatePath(`/admin/users/${input.userId}`);
   return { ok: true };
 }
+
+export async function unlockUserAction(input: {
+  userId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await requireAdminUsers();
+  if (!session) return { ok: false, error: "Forbidden." };
+
+  const target = await db.query.users.findFirst({
+    where: eq(users.id, input.userId),
+    columns: { id: true },
+  });
+  if (!target) return { ok: false, error: "User not found." };
+
+  // Idempotent: setting null → null and 0 → 0 on an already-unlocked user
+  // is a no-op. This cleanly handles race conditions and expired-lock rows.
+  await db
+    .update(users)
+    .set({ lockedUntil: null, failedLoginAttempts: 0 })
+    .where(eq(users.id, input.userId));
+
+  await recordAudit({
+    action: AUDIT_ACTIONS.USER_ACCOUNT_UNLOCKED,
+    resourceType: "user",
+    resourceId: input.userId,
+    metadata: { clearedByAdminId: session.user.id },
+  });
+
+  revalidatePath("/admin/users");
+  return { ok: true };
+}

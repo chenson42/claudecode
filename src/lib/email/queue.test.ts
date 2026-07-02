@@ -81,7 +81,7 @@ vi.mock("drizzle-orm", async (importOriginal) => {
 });
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { computeNextAttemptAt, enqueueEmail, processQueueBatch } from "./queue";
+import { computeNextAttemptAt, enqueueEmail, processQueueBatch, recordDeliveryEvent } from "./queue";
 
 // ---------------------------------------------------------------------------
 // Backoff math — computeNextAttemptAt
@@ -429,5 +429,86 @@ describe("processQueueBatch — lease recovery calls db.update before db.execute
     await processQueueBatch(10);
 
     expect(callOrder).toEqual(["update", "execute"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recordDeliveryEvent — delivery-event column mapping
+// ---------------------------------------------------------------------------
+
+describe("recordDeliveryEvent — column mapping and matched return value", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUpdateReturning.mockResolvedValue([{ id: "row-1" }]);
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
+    mockUpdate.mockReturnValue({ set: mockUpdateSet });
+  });
+
+  it("email.delivered → calls db.update with deliveredAt set; does not touch failureReason", async () => {
+    const result = await recordDeliveryEvent("msg-id-abc", "email.delivered");
+
+    expect(mockUpdate).toHaveBeenCalledOnce();
+    const setArg = mockUpdateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).toHaveProperty("deliveredAt");
+    expect(setArg).not.toHaveProperty("failureReason");
+    expect(result).toEqual({ matched: true });
+  });
+
+  it("email.opened → calls db.update with openedAt set", async () => {
+    await recordDeliveryEvent("msg-id-abc", "email.opened");
+
+    const setArg = mockUpdateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).toHaveProperty("openedAt");
+    expect(setArg).not.toHaveProperty("failureReason");
+  });
+
+  it("email.clicked → calls db.update with clickedAt set", async () => {
+    await recordDeliveryEvent("msg-id-abc", "email.clicked");
+
+    const setArg = mockUpdateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).toHaveProperty("clickedAt");
+  });
+
+  it("email.bounced with failureReason → sets bouncedAt AND failureReason", async () => {
+    await recordDeliveryEvent("msg-id-abc", "email.bounced", {
+      failureReason: "bounced: invalid recipient",
+    });
+
+    const setArg = mockUpdateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).toHaveProperty("bouncedAt");
+    expect(setArg).toHaveProperty("failureReason", "bounced: invalid recipient");
+  });
+
+  it("email.bounced WITHOUT failureReason → sets bouncedAt but NOT failureReason", async () => {
+    await recordDeliveryEvent("msg-id-abc", "email.bounced");
+
+    const setArg = mockUpdateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).toHaveProperty("bouncedAt");
+    expect(setArg).not.toHaveProperty("failureReason");
+  });
+
+  it("email.complained → calls db.update with complainedAt set", async () => {
+    await recordDeliveryEvent("msg-id-abc", "email.complained");
+
+    const setArg = mockUpdateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).toHaveProperty("complainedAt");
+  });
+
+  it("returns { matched: false } when db.update returns empty array (no row matched)", async () => {
+    mockUpdateReturning.mockResolvedValue([]);
+
+    const result = await recordDeliveryEvent("no-such-id", "email.delivered");
+    expect(result).toEqual({ matched: false });
+  });
+
+  it("respects opts.occurredAt when provided", async () => {
+    const fixedDate = new Date("2026-01-15T10:00:00Z");
+    await recordDeliveryEvent("msg-id-abc", "email.delivered", {
+      occurredAt: fixedDate,
+    });
+
+    const setArg = mockUpdateSet.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg.deliveredAt).toBe(fixedDate);
   });
 });

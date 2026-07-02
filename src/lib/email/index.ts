@@ -7,8 +7,8 @@ export { escapeHtml } from "./escape-html";
 
 // enqueueEmail is the canonical entry point for all outbound email.
 // Do NOT call sendEmail() directly from server actions or pages — see DECISION-018.
-export { enqueueEmail } from "./queue";
-export type { EnqueueEmailInput, BatchResult } from "./queue";
+export { enqueueEmail, recordDeliveryEvent } from "./queue";
+export type { EnqueueEmailInput, BatchResult, DeliveryEventType } from "./queue";
 
 // sendPasswordResetEmail is kept for fork backward compat.
 // @deprecated — call enqueueEmail() directly with templateKey: 'password_reset'.
