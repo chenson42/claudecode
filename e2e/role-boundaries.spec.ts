@@ -58,18 +58,22 @@ test.describe("Member — /admin blocked", () => {
   });
 });
 
-// Test 3 — MFA-admin: /admin triggers /totp gate
-test.describe("MFA-admin — /totp gate", () => {
+// Test 3 — MFA-admin: /admin triggers two-hop redirect gate
+// After the fix in 2026-07-02-totp-enrollment-redirect: the mfa-admin (no
+// enrollment) is now redirected from /totp → /account/2fa. Test 3 asserts
+// the two-hop chain (proxy → /totp → /account/2fa) and stops there — the
+// fixture cannot complete enrollment.
+test.describe("MFA-admin — two-hop redirect gate", () => {
   // Session is intentionally NOT TOTP-verified (twoFactorRequired=true,
   // twoFactorVerified=false). Use only to assert the /totp redirect fires.
   test.use({ storageState: storageStatePath("mfa-admin") });
 
-  test("mfa-admin navigating to /admin is redirected to /totp with callbackUrl", async ({
+  test("mfa-admin navigating to /admin is redirected to /account/2fa with callbackUrl (proxy → /totp → /account/2fa)", async ({
     page,
   }) => {
     test.skip(!HAVE_MFA_ADMIN, "SEED_MFA_ADMIN_EMAIL/PASSWORD not set");
     await page.goto("/admin");
-    await expect(page).toHaveURL(/\/totp/);
+    await expect(page).toHaveURL(/\/account\/2fa/);
     const url = new URL(page.url());
     expect(url.searchParams.get("callbackUrl")).toBe("/admin");
   });

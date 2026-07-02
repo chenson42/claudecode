@@ -12,15 +12,23 @@ import {
   getOrCreatePendingEnrollment,
   PENDING_TTL_MINUTES,
 } from "@/lib/totp-pending";
+import { sanitizeCallbackUrl } from "@/lib/auth/safe-callback";
 import { clearFreshCodesCookieAction } from "./actions";
 import { TotpEnrollForm } from "./totp-enroll-form";
 import { RegenerateCodesForm } from "./regenerate-codes-form";
 import { FormattedDate } from "@/components/shared/formatted-date";
 import { FreshRecoveryCodes } from "@/components/shared/fresh-recovery-codes";
 
-export default async function AccountTwoFactorPage() {
+export default async function AccountTwoFactorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/signin?callbackUrl=/account/2fa");
+
+  const sp = await searchParams;
+  const callbackUrl = sanitizeCallbackUrl(sp.callbackUrl);
 
   const jar = await cookies();
   const rawFreshCodes = jar.get(FRESH_RECOVERY_CODES_COOKIE)?.value ?? null;
@@ -91,6 +99,7 @@ export default async function AccountTwoFactorPage() {
       uri={enrollData.uri}
       secret={enrollData.secret}
       pendingTtlMinutes={PENDING_TTL_MINUTES}
+      callbackUrl={callbackUrl}
     />
   );
 }

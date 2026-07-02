@@ -89,8 +89,9 @@ test.describe("Member home and routing invariants", () => {
     ).toBe("/access-pending");
   });
 
-  // test 6: user with twoFactorRequired=true navigating to /admin is redirected to /totp
-  test("user with twoFactorRequired=true navigating to /admin is redirected to /totp", async ({ page }) => {
+  // test 6: user with twoFactorRequired=true and no enrollment navigating to /admin
+  // is redirected through the two-hop chain: proxy → /totp → /account/2fa
+  test("user with twoFactorRequired=true navigating to /admin is redirected to /account/2fa via two-hop chain", async ({ page }) => {
     test.skip(!hasMfaAdminCreds, "SEED_MFA_ADMIN_EMAIL / SEED_MFA_ADMIN_PASSWORD must be set");
 
     await page.goto("/signin");
@@ -105,10 +106,12 @@ test.describe("Member home and routing invariants", () => {
       "MFA admin should land on /home (2FA gate does not apply to /home)",
     ).toBe("/home");
 
-    // Now navigate to /admin — the proxy should gate it behind TOTP.
+    // Now navigate to /admin — the proxy gates it behind TOTP. Because the
+    // mfa-admin has no enrollment, /totp immediately redirects to /account/2fa
+    // (two-hop chain: proxy → /totp → /account/2fa).
     await page.goto("/admin");
+    await expect(page).toHaveURL(/\/account\/2fa/);
     const afterAdminUrl = new URL(page.url());
-    expect(afterAdminUrl.pathname, "should redirect to /totp").toBe("/totp");
     expect(
       afterAdminUrl.searchParams.get("callbackUrl"),
       "callbackUrl should be /admin",
