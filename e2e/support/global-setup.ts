@@ -19,6 +19,7 @@
 import { chromium, type FullConfig } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { neon } from "@neondatabase/serverless";
 
 const AUTH_DIR = path.resolve(__dirname, ".auth");
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
@@ -66,6 +67,35 @@ function runDbIsolationGuard(): void {
 
   // Step F: local dev — warn and continue
   console.warn("\n" + ACTIONABLE_MESSAGE + "\n");
+}
+
+async function cleanupTestFeedback(dbUrl: string): Promise<void> {
+  const emails = [
+    process.env.SEED_ADMIN_EMAIL,
+    process.env.SEED_MEMBER_EMAIL,
+    process.env.SEED_MFA_ADMIN_EMAIL,
+  ].filter((e): e is string => typeof e === "string" && e.length > 0);
+
+  if (emails.length === 0 || !dbUrl) return;
+
+  try {
+    const sql = neon(dbUrl);
+    const deleted = await sql`
+      DELETE FROM feedback
+      WHERE user_id IN (
+        SELECT id FROM users WHERE email = ANY(${emails})
+      )
+      RETURNING id
+    `;
+    console.log(
+      `[globalSetup] cleanup: deleted ${deleted.length} test feedback rows`
+    );
+  } catch (err) {
+    console.warn(
+      "[globalSetup] cleanup: failed to delete test feedback rows (continuing)",
+      err
+    );
+  }
 }
 
 async function signInAndSave(
@@ -149,6 +179,10 @@ async function signInAndSave(
 export default async function globalSetup(config: FullConfig): Promise<void> {
   // DB isolation guard runs first — before any browser launch
   runDbIsolationGuard();
+
+  await cleanupTestFeedback(
+    process.env.E2E_DATABASE_URL ?? process.env.DATABASE_URL ?? ""
+  );
 
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 
