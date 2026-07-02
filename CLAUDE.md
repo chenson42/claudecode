@@ -22,6 +22,14 @@ Out of the box, a fork ships with:
 - **Audit log** — Append-only `audit_events` table. Security-sensitive mutations write rows here.
 - **Release notes viewer** — Admin docs page renders versioned release notes from `docs/release-notes/vX.Y.md`.
 - **In-app feedback loop** — Members submit suggestions and bug reports from `/home` (daily prompt card, once per local day) and `/account` (permanent form). A `SessionStart` hook counts unread submissions and surfaces a triage banner at the start of each coding session. Accepted items spin into the six-phase pipeline with a Source block in the work-log; delivered items are marked `done` at Phase 6. The feedback body never enters the LLM context — the hook emits only the count.
+- **Member home** — post-login landing at `/home` with a global nav (conditional Admin link); every `callbackUrl` sanitized, falling back to `/home`.
+- **What's-new changelog** — admins publish entries at `/admin/whats-new`; members see them on `/home` and `/whats-new`. Closes the feedback loop user-visibly (Workflow Rule 13).
+- **Durable email queue** — sends persist first and retry with backoff via a `CRON_SECRET`-gated Vercel cron; Resend delivery webhook fills per-message delivery status; `/admin/email-queue` viewer with retry. A daily maintenance cron sweeps expired tokens.
+- **Audit log viewer** — `/admin/audit`, filterable by action and actor; `recordAudit()` captures actor, IP, and user-agent on every event.
+- **Account lockout** — 5 failed passwords lock credentials sign-in for 15 minutes (enumeration-safe, OAuth-exempt); admins see and clear locks on `/admin/users`.
+- **Turnstile CAPTCHA** — endpoint-level bot protection on sign-in and forgot-password; a complete no-op until two env vars are set.
+- **Auth-mode flags** — `auth.local_login` (OAuth-only mode, gating `authorize()` itself) and `auth.require_2fa` (org-wide 2FA switch), both fail-open, toggled at `/admin/flags`.
+- **Report-only CSP** — grounded in the app's real resource loads, with a documented fork-tightening path to enforcement.
 - **Route protection** — `src/proxy.ts` enforces the auth + 2FA gate at the edge (Next 16's `proxy.ts` convention, which replaces the deprecated `middleware.ts`).
 - **Seed script** — `scripts/seed.ts` creates admin and member roles, seeds every feature in `FEATURE_CATALOG`, and registers a demo feature flag.
 - **Self-serve account page** — `/account` lets signed-in users update their display name, change their email (triggers re-verification), change their password, manage per-user TOTP at `/account/2fa`, and reach a delete-account skeleton.
@@ -357,6 +365,8 @@ npm run db:generate  # Generate a versioned SQL migration in drizzle/ (use this 
 npm run db:migrate   # Apply committed SQL migrations (production-safe; use instead of db:push in staging/prod)
 npm run db:seed      # Seed roles, features, and the demo flag
 npm run check:audit  # Tripwire: every mutation in actions.ts files must reference an AUDIT_ACTIONS key
+npm run check:sql-date # Tripwire: bans sql<Date> typings (neon-http returns strings for raw-SQL dates)
+npm run check        # Both tripwires in sequence
 npm run stats:escape # 30-day escape-rate report (per-channel fix breakdown for the weekly retrospective)
 npm run deck         # Render deck/slides.md → slides.pptx + slides.pdf
 npm run deck:pptx    # PowerPoint only
