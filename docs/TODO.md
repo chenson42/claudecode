@@ -18,9 +18,7 @@ detail lives in the linked doc, not here.
 
 - [ ] `/test` + `/test-results` skills port — in progress (doc-only)
 - [ ] Push `feat/post-login-routing-and-e2e` (2 commits ready, awaiting `/pre-push` + user push) and open the PR
-- [ ] Per-account login lockout — Phase 3 complete (design done), advancing to api-developer Phase 4 — `docs/work-log/2026-07-01-account-lockout.md`
-- [ ] Report-only CSP + HSTS preload removal — Phase 4 complete, advancing to qa (Phase 5) — `docs/work-log/2026-07-01-security-headers.md`
-- [ ] ACCESS_DENIED audit event on /access-pending bounce — Phase 4 complete (30/30 e2e), advancing to qa (Phase 5) — `docs/work-log/2026-07-01-access-denied-audit.md`
+- [ ] Per-account login lockout — Phase 4 complete (implementation done), advancing to qa Phase 5 — `docs/work-log/2026-07-01-account-lockout.md`
 - [ ] `check:sql-date` tripwire — Phase 1 complete (READY WITH NOTES), advancing to architect Phase 2 — `docs/work-log/2026-07-01-sql-date-tripwire.md`
 - [ ] `cache()`-wrap `isFlagEnabled` + (pending empirical check) `cachedAuth` — Phase 1 complete (READY WITH NOTES) — `docs/work-log/2026-07-01-flag-caching.md`
 - [ ] Opportunistic expired-token GC — Phase 1 complete (READY WITH NOTES), advancing to architect Phase 2 — `docs/work-log/2026-07-01-token-gc.md`
@@ -57,3 +55,5 @@ detail lives in the linked doc, not here.
 - [x] 2026-07-01 — E2E auth infra (cached storageState, role boundaries, DB isolation guard) — SHIP IT — `docs/work-log/2026-07-01-e2e-auth-infra.md`
 - [x] 2026-07-01 — Durable email queue with retry (persist-first enqueue, cron worker, vercel.json) — SHIP IT — `docs/work-log/2026-07-01-email-queue.md`
 - [x] 2026-07-01 — In-app feedback + dev-loop triage wiring — SHIP WITH NOTES (FU-1: e2e test-data hygiene) — `docs/work-log/2026-07-01-feedback-dev-loop.md`
+- [x] 2026-07-01 — Report-only CSP + HSTS preload removal — SHIP IT — `docs/work-log/2026-07-01-security-headers.md`
+- [x] 2026-07-01 — ACCESS_DENIED audit event on /access-pending bounce — SHIP IT — `docs/work-log/2026-07-01-access-denied-audit.md`

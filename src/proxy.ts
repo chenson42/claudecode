@@ -56,7 +56,9 @@ export async function proxy(req: NextRequest) {
     if (rule.pattern.test(pathname)) {
       const ok = session.user.features?.includes(rule.required);
       if (!ok) {
-        return NextResponse.redirect(new URL("/access-pending", req.url));
+        const dest = new URL("/access-pending", req.url);
+        dest.searchParams.set("from", pathname);
+        return NextResponse.redirect(dest);
       }
       return NextResponse.next();
     }

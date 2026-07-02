@@ -92,6 +92,10 @@ const EXPECTED_ENTRIES: Record<keyof typeof AUDIT_ACTIONS, string> = {
   RATE_LIMIT_BLOCKED: "rate_limit.blocked",
   // Email queue — written from src/lib/email/queue.ts, not from actions.ts
   EMAIL_QUEUE_PERMANENT_FAILURE: "email.queue.permanent_failure",
+  // Access gate — written from src/app/access-pending/page.tsx during RSC render
+  ACCESS_DENIED: "access.denied",
+  // Account lockout — written from src/auth.ts authorize(), not from actions.ts
+  USER_ACCOUNT_LOCKED: "user.account_locked",
 };
 
 const EXPECTED_COUNT = Object.keys(EXPECTED_ENTRIES).length;

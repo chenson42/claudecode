@@ -44,6 +44,16 @@ export const AUDIT_ACTIONS = {
   // Email queue — system event; written from src/lib/email/queue.ts (not an
   // actions.ts file, so not covered by the check:audit tripwire — intentional).
   EMAIL_QUEUE_PERMANENT_FAILURE: "email.queue.permanent_failure",
+  // Access gate — written from src/app/access-pending/page.tsx during RSC
+  // render, not from an actions.ts file. The check:audit tripwire scans only
+  // src/app/**/actions.ts and will not see this write. That is intentional —
+  // the page component is the audit site. This follows the RATE_LIMIT_BLOCKED
+  // and EMAIL_QUEUE_PERMANENT_FAILURE precedents above.
+  ACCESS_DENIED: "access.denied",
+  // Account lockout — infrastructure event written from src/auth.ts authorize()
+  // (not an actions.ts file, so not covered by the check:audit tripwire —
+  // intentional, same pattern as RATE_LIMIT_BLOCKED and EMAIL_QUEUE_PERMANENT_FAILURE).
+  USER_ACCOUNT_LOCKED: "user.account_locked",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
