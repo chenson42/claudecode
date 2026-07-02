@@ -16,8 +16,6 @@ detail lives in the linked doc, not here.
 
 ## In Flight
 
-- [ ] `/test` + `/test-results` skills port — in progress (doc-only)
-- [ ] Push `feat/post-login-routing-and-e2e` (2 commits ready, awaiting `/pre-push` + user push) and open the PR
 
 ## Next Up
 
@@ -31,6 +29,9 @@ detail lives in the linked doc, not here.
 - [ ] TOTP enrolment e2e — requires either a seeded deterministic TOTP secret (security risk — see routing feature option (c) rationale, e2e-auth-infra work-log Phase 2 Ruling 7) or external authenticator integration; deferred until a safe pattern is designed
 
 ## Done
+
+- [x] 2026-07-02 — v0.6.0 shipped: PR #4 merged to main (30 commits — member home, feedback dev-loop, admin ops suite, email reliability, security batch, 6 fixes, tooling); branch deleted via /merge-pr
+- [x] 2026-07-01 — `/test` + `/test-results` skills ported (commit 4afcc36)
 
 - [x] 2026-07-02 — E2E feedback test-data cleanup — globalSetup preflight sweep scoped to seed-user emails; 9 stale rows swept on first run — SHIP IT — `docs/work-log/2026-07-02-e2e-feedback-cleanup.md`
 - [x] 2026-07-02 — `(email-verify)` error boundary — `error.tsx` added at group level; ui-standards.md rule written — SHIP IT — `docs/work-log/2026-07-02-email-verify-error-boundary.md`
