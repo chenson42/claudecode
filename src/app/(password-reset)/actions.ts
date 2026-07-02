@@ -10,6 +10,7 @@ import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
 import { enqueueEmail } from "@/lib/email";
 import { getRequestIp } from "@/lib/request-ip";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { verifyTurnstile } from "@/lib/turnstile";
 import type { ActionResult } from "@/types/actions";
 
 function sha256Hex(raw: string): string {
@@ -26,14 +27,27 @@ function sha256Hex(raw: string): string {
 
 export async function requestPasswordReset(input: {
   email: string;
+  turnstileToken?: string; // optional — absent when keys not configured
 }): Promise<ActionResult> {
+  const hdrs = await headers();
+  const ip = getRequestIp(hdrs);
+
+  // Turnstile check — before rate limit so bot traffic does not consume IP budget.
+  // Returns true (no-op) when TURNSTILE_SECRET_KEY is not configured.
+  // Fail-open on Cloudflare outage (DECISION-026).
+  const captchaOk = await verifyTurnstile(input.turnstileToken, ip);
+  if (!captchaOk) {
+    return {
+      ok: false,
+      error: "Verification failed. Please reload and try again.",
+    };
+  }
+
   // Rate limit: 5/hour by IP.
   // NOTE: Unlike the rest of this function, returning { ok: false } here does
   // NOT expose email existence — the block fires on IP regardless of whether
   // the submitted email belongs to a real account. This deliberate deviation
   // from the always-{ ok:true } pattern is safe for IP-keyed limits.
-  const hdrs = await headers();
-  const ip = getRequestIp(hdrs);
   const limited = await checkRateLimit(
     `pwreset_req:${ip ?? "unknown"}`,
     { max: 5, windowSeconds: 3600 },

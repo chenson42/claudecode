@@ -21,24 +21,23 @@ detail lives in the linked doc, not here.
 
 ## Next Up
 
-- [ ] Mobile (360px) visual pass on global nav + member home — Phase 6 follow-up, post-login-routing work-log
-
 ## Backlog
 
-- [ ] Turnstile CAPTCHA component (no-op until keyed) for `/signin` + `/forgot-password` — harvest Tier 2 #12
-- [ ] Audit log viewer under /admin/audit — display ip, user_agent, actorEmail, metadata per row; filter by action and date range — follow-up, record-audit-helper work-log
+- [ ] Admin lock-state detail page — add lock badge + unlock action to `/admin/users/[id]` — follow-up from `docs/work-log/2026-07-02-admin-lock-visibility.md` Phase 3 scope decision
+- [ ] `(password-reset)` error boundary — same gap as `(email-verify)`; unauthenticated token-lookup route, no error.tsx — tracked from `docs/work-log/2026-07-02-email-verify-error-boundary.md` Phase 1 Pass 5
 - [ ] Tier 4 utilities on demand (csvCellSafe, ssrf-guard, magic-bytes, maskEmail, settings store, ConfirmDialog, iconKey nav, cf-connecting-ip, route-table 2FA gate, …) — harvest Tier 4
-- [ ] `(email-verify)` route group has no `error.tsx` — non-23505 throws in `verify-email/[token]/page.tsx` surface as a raw 500 — follow-up from `isUniqueViolation()` Phase 2 — `docs/work-log/2026-07-01-unique-violation-helper.md`
-- [ ] Admin queue viewer under /admin/email-queue — display status, recipient, subject, attempt count, last error per row; filter by status and date range. Needs `admin.email_queue` permission when built — follow-up, email-queue work-log
-- [ ] Resend delivery webhook (Svix-verified webhook to update email_queue row status from `sent` to `delivered` or `bounced`) — harvest Tier 2 #7 optional pair, email-queue work-log
-- [ ] Member-visible what's-new / changelog — V2 loop-closure: surface delivered feedback-sourced features to members (requires a member-facing surface for release notes, currently admin-only); tracked as follow-up from feedback-dev-loop pipeline — `docs/work-log/2026-07-01-feedback-dev-loop.md`
 - [ ] TOTP enrolment e2e — requires either a seeded deterministic TOTP secret (security risk — see routing feature option (c) rationale, e2e-auth-infra work-log Phase 2 Ruling 7) or external authenticator integration; deferred until a safe pattern is designed
-- [ ] Admin lock-state visibility in /admin/users — show `lockedUntil` per user row; add manual unlock action — follow-up, account-lockout Phase 2 ruling R8
-- [ ] TOTP enrollment-stranding gap — user with `twoFactorRequired=true` and no enrolled secret is redirected to /totp (verification), not /account/2fa (enrollment), and gets stuck in a redirect loop; pre-existing but elevated by seeding `require_2fa: true`; needs redirect-to-enrollment path from /totp when no secret is enrolled — auth-mode-flags Phase 3, `docs/work-log/2026-07-01-auth-mode-flags.md`
-- [ ] E2E test-data hygiene for feedback: rows submitted during e2e runs persist in the dev DB with status='new', causing the SessionStart hook to fire a banner for test artifacts on every session; add afterAll cleanup in `e2e/feedback.spec.ts` or truncate in `e2e/support/global-setup.ts` — Phase 6 follow-up, feedback-dev-loop work-log
 
 ## Done
 
+- [x] 2026-07-02 — E2E feedback test-data cleanup — globalSetup preflight sweep scoped to seed-user emails; 9 stale rows swept on first run — SHIP IT — `docs/work-log/2026-07-02-e2e-feedback-cleanup.md`
+- [x] 2026-07-02 — `(email-verify)` error boundary — `error.tsx` added at group level; ui-standards.md rule written — SHIP IT — `docs/work-log/2026-07-02-email-verify-error-boundary.md`
+- [x] 2026-07-02 — TOTP enrollment-stranding fix — two-hop redirect chain (proxy → /totp → /account/2fa?callbackUrl=) implemented; "Continue" CTA; auth e2e gate cleared 48/48 — SHIP IT — `docs/work-log/2026-07-02-totp-enrollment-redirect.md`
+- [x] 2026-07-02 — Admin lock-state visibility + unlock — amber badge + inline unlock form; `USER_ACCOUNT_UNLOCKED` audit event; check:audit passes — SHIP IT — `docs/work-log/2026-07-02-admin-lock-visibility.md`
+- [x] 2026-07-02 — Turnstile CAPTCHA (no-op until keyed) — endpoint-level verification in authorize(); fail-open; CSP updated; 48/48 e2e with no keys — SHIP IT — `docs/work-log/2026-07-02-turnstile-captcha.md`
+- [x] 2026-07-02 — Email queue admin viewer + Resend delivery webhook — migration 0006; hand-rolled HMAC (3 Phase 2 mandates); /admin/email-queue viewer + retry; 48/48 e2e — SHIP IT — `docs/work-log/2026-07-02-email-observability.md`
+- [x] 2026-07-02 — Member-visible what's-new — migration 0007; validateWhatsNewEntry (HTML-reject, spread emoji check); admin CRUD; member /home card + /whats-new; Rule 13 advisory; 48/48 e2e — SHIP IT — `docs/work-log/2026-07-02-whats-new.md`
+- [x] 2026-07-02 — Audit log viewer at `/admin/audit` — pure RSC; input guards with 13 unit tests; grouped action select; admin.audit permission; SOC 2 fork note; 48/48 e2e — SHIP IT — `docs/work-log/2026-07-02-audit-log-viewer.md`
 - [x] 2026-07-01 — Process batch: `docs/ui-standards.md`, `downstream-sync` skill, QA feature-gate table + no-self-agreeing-mocks, force-push guardrail (Rule 11 + deployment-engineer), `/pre-push` CVE step, database-admin `onDelete` rule, api-developer email-escape rule, TODO ledger (Rule 10) — harvest Tier 3 #16-20, #23 (instructions)
 - [x] 2026-07-01 — BUG-1: verify-email `db.transaction()` on neon-http → `db.batch()` — SHIP IT — `docs/work-log/2026-07-01-verify-email-neon-http-transaction.md`
 - [x] 2026-07-01 — BUG-2: 2FA fresh-recovery-codes cookie deleted during RSC render — SHIP IT — `docs/work-log/2026-07-01-2fa-fresh-codes-rsc-cookie.md`
@@ -48,6 +47,7 @@ detail lives in the linked doc, not here.
 - [x] 2026-07-01 — Sibling harvest of 7 fork repos → classified punch-list — committed `4c54e4f`
 - [x] 2026-07-01 — recordAudit() helper (audit ip/user_agent, request-ip.ts shared module, logAttempt elimination) — SHIP IT — `docs/work-log/2026-07-01-record-audit-helper.md`
 - [x] 2026-07-01 — isUniqueViolation() helper (verify-email ErrorCard, password-reset atomic upsert) — SHIP IT — `docs/work-log/2026-07-01-unique-violation-helper.md`
+- [x] 2026-07-02 — Mobile (360px) visual pass — account+admin sidebar layout, global nav crowding — CSS-only, batch QA covers regression — `docs/work-log/2026-07-02-mobile-360-pass.md`
 - [x] 2026-07-01 — E2E auth infra (cached storageState, role boundaries, DB isolation guard) — SHIP IT — `docs/work-log/2026-07-01-e2e-auth-infra.md`
 - [x] 2026-07-01 — Durable email queue with retry (persist-first enqueue, cron worker, vercel.json) — SHIP IT — `docs/work-log/2026-07-01-email-queue.md`
 - [x] 2026-07-01 — In-app feedback + dev-loop triage wiring — SHIP WITH NOTES (FU-1: e2e test-data hygiene) — `docs/work-log/2026-07-01-feedback-dev-loop.md`

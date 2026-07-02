@@ -4,6 +4,54 @@ Architectural and implementation decisions for the Claude Code Starter. Newest f
 
 ---
 
+## DECISION-028: `api/webhooks/` subtree is the sanctioned location for inbound webhook handlers; disabled-when-unset returns 200 not 5xx
+
+**Status:** Resolved
+**Date:** 2026-07-02
+**Feature:** `2026-07-02-email-observability`
+
+### Decision
+
+The first webhook handler in the starter (`/api/webhooks/resend`) establishes the following conventions for all subsequent webhook integrations:
+
+**1. Placement:** All inbound webhook route handlers live under `src/app/api/webhooks/<provider>/route.ts`. No webhook handler belongs in `api/admin/` (admin requires auth; webhooks authenticate via signature) or at the top level of `api/` (flat namespace does not scale when multiple providers are integrated).
+
+**2. Signature verification is the route handler's responsibility.** Each handler verifies its own provider signature before doing anything else. The proxy (`src/proxy.ts`) does not participate in webhook authentication — it bypasses the auth gate for `api/webhooks/*` paths, leaving signature verification entirely to the route handler body. This is correct because (a) the proxy cannot read the raw body without consuming it, and (b) each provider has a different signature scheme.
+
+**3. Disabled-when-unset posture:** When the required env var (e.g., `RESEND_WEBHOOK_SECRET`) is absent, the handler returns **HTTP 200** with a JSON body indicating the webhook is not configured — **not 503 or 401**.
+
+Rationale: 503 (Service Unavailable) is a retryable status code. Any webhook provider that delivers to an endpoint returning 503 will retry indefinitely. A missing env var is a permanent configuration state, not a transient failure. Returning 200 acknowledges the delivery and terminates it cleanly. The response body `{received: false, note: "Webhook not configured."}` distinguishes this case from a successful handled delivery `{received: true, handled: true}` in server logs.
+
+401 is also wrong — it implies the caller could authenticate if it provided different credentials, which is not the case when the server has no secret to compare against.
+
+**4. Unknown event types return 200.** A webhook handler must never return 4xx or 5xx for an event type it does not recognize. Providers retry on 4xx/5xx. Returning 200 with `{received: true, handled: false}` acknowledges the event without triggering a retry storm. This is the correct posture for forward-compatibility: the provider may introduce new event types that the starter does not handle yet.
+
+**5. 500 is acceptable for transient DB errors.** A DB-unavailable condition during an otherwise-valid signed webhook event is a server-side transient failure. Returning 500 allows the provider to retry after the DB recovers. This is the one case where a 5xx is appropriate.
+
+### Convention going forward
+
+Any new webhook integration (Stripe, GitHub, etc.) placed in `src/app/api/webhooks/<provider>/route.ts` must:
+- Check for its required env var and return 200 + `{received: false, note: "..."}` if absent
+- Verify the provider signature before reading the event body (and return 400 on invalid signature — providers do NOT retry 400s, which is the correct behavior for a genuine bad-signature rejection)
+- Return 200 + `{received: true, handled: false}` for unknown event types
+- Return 200 + `{received: true, handled: true}` on successful processing
+- Return 500 only for transient server errors (DB down, etc.)
+
+The proxy `PUBLIC_PATHS` or equivalent `api/webhooks/*` bypass must be confirmed for each new provider path — the proxy must not redirect to sign-in before the handler can verify the signature.
+
+### What is NOT changed
+
+- `src/proxy.ts` route gating logic is unchanged. `api/webhooks/*` paths fall through the proxy without an auth redirect by virtue of being in the `api/` subtree (which the proxy does not redirect to sign-in). This must be verified in Phase 3 for any new webhook path.
+- No new npm dependencies from this decision (the svix-vs-hand-rolled ruling is a Phase 4 implementation choice, not an architectural decision).
+
+### Impact
+
+- Establishes `src/app/api/webhooks/` as the canonical webhook handler location.
+- `src/app/api/webhooks/resend/route.ts` is the first concrete instance.
+- No existing files are changed by this decision.
+
+---
+
 ## DECISION-027: Maintenance cron route is a sibling to the operational cron route; `vercel.json` carries both schedules
 
 **Status:** Resolved

@@ -35,8 +35,14 @@ const securityHeaders = [
     // Dev note: the Next.js HMR WebSocket (ws://localhost:<port>/_next/webpack-hmr) generates
     // connect-src violation noise in devtools during `npm run dev`. This is expected; ignore it.
     // A future enforced CSP will need `ws://localhost:<port>` in connect-src for dev builds.
+    // Cloudflare Turnstile: remove https://challenges.cloudflare.com from script-src
+    // and restore frame-src 'none' if not using NEXT_PUBLIC_TURNSTILE_SITE_KEY.
+    //
+    // connect-src does NOT include Cloudflare: the Turnstile iframe's outbound
+    // fetches are governed by the iframe's own CSP (set by Cloudflare), not the
+    // parent page's connect-src. Parent JS does not XHR to Cloudflare directly.
     value:
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://lh3.googleusercontent.com; font-src 'self'; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://lh3.googleusercontent.com; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   },
 ];
 

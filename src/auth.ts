@@ -30,6 +30,7 @@ import {
   isLocalLoginEnabled,
   computeEffectiveTwoFactor,
 } from "@/lib/auth/local-login";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 const INITIAL_ADMIN_EMAILS = (process.env.INITIAL_ADMIN_EMAILS ?? "")
   .split(",")
@@ -97,6 +98,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        // NextAuth 5 beta strips undeclared fields before authorize() is called.
+        // type: "hidden" suppresses this field in any auto-generated sign-in form.
+        turnstileToken: { label: "Turnstile Token", type: "hidden" },
       },
       async authorize(credentials, request) {
         const email = (credentials?.email as string | undefined)?.toLowerCase();
@@ -110,13 +114,25 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const localLoginEnabled = await isLocalLoginEnabled();
         if (!localLoginEnabled) return null;
 
-        // Rate limit: 5/min keyed by ip:email composite.
+        // Extract IP early — shared by step 0.5 (Turnstile) and step 1 (rate limit).
         // NextAuth 5 beta passes the original Request as the second arg.
-        // If headers are unavailable for any reason the key degrades to
-        // "signin:unknown:<email>" — still a meaningful per-email limit.
+        // If headers are unavailable the key degrades to "unknown" — still a
+        // meaningful per-email rate limit.
         const ip = getRequestIp(
           (request as Request | undefined)?.headers ?? new Headers(),
         );
+
+        // Step 0.5: Turnstile verification — BEFORE rate limit so bot traffic
+        // does not consume rate-limit budget. Fail-open when TURNSTILE_SECRET_KEY
+        // is unset (the starter default, DECISION-026). Surfaces to the user as
+        // CredentialsSignin — no leakage about why the check failed.
+        const turnstileOk = await verifyTurnstile(
+          credentials?.turnstileToken as string | undefined,
+          ip,
+        );
+        if (!turnstileOk) return null;
+
+        // Rate limit: 5/min keyed by ip:email composite.
         const limited = await checkRateLimit(
           `signin:${ip ?? "unknown"}:${email}`,
           { max: 5, windowSeconds: 60 },
