@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import {
@@ -20,6 +20,12 @@ import { evaluateSignIn } from "@/lib/auth/sign-in-gate";
 import { ADMIN_ROLE, FEATURES, MEMBER_ROLE } from "@/lib/permissions";
 import { getRequestIp } from "@/lib/request-ip";
 import { checkRateLimit } from "@/lib/rate-limit";
+import {
+  checkLockout,
+  LOCKOUT_THRESHOLD,
+  LOCKOUT_DURATION_SECONDS,
+} from "@/lib/auth/lockout";
+import { AUDIT_ACTIONS, recordAudit } from "@/lib/audit";
 
 const INITIAL_ADMIN_EMAILS = (process.env.INITIAL_ADMIN_EMAILS ?? "")
   .split(",")
@@ -112,8 +118,63 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         });
         if (!user?.password || !user.isActive) return null;
 
+        // Step 5: lockout check (credentials path only — see lockout.ts header).
+        // Returns null via the same code path as wrong-password to prevent enumeration.
+        const now = new Date();
+        const lockStatus = checkLockout(user, now);
+        if (lockStatus.locked) return null;
+
+        // Step 5b: lock window has expired — reset the counter before calling bcrypt
+        // so the user gets a fresh LOCKOUT_THRESHOLD window, not an immediate re-lock
+        // on the first failure after expiry (Gap 2 fix; see lockout.ts LockoutState.resetCounter).
+        if (lockStatus.resetCounter) {
+          await db
+            .update(users)
+            .set({ failedLoginAttempts: 0, lockedUntil: null })
+            .where(eq(users.id, user.id));
+        }
+
         const ok = await bcrypt.compare(password, user.password);
-        if (!ok) return null;
+
+        if (!ok) {
+          // Atomic conditional-increment. Single UPDATE avoids the SELECT-then-write
+          // race that could cause both the lock set and the audit event to double-fire
+          // under concurrent requests. See DECISION-025 and the Phase 3 design doc for
+          // full SQL semantics. Untyped sql`` (no generic) is intentional — the type
+          // parameter is unnecessary on .set() RHS expressions in Drizzle.
+          const [updated] = await db
+            .update(users)
+            .set({
+              failedLoginAttempts: sql`failed_login_attempts + 1`,
+              lockedUntil: sql`
+                CASE WHEN failed_login_attempts + 1 >= ${LOCKOUT_THRESHOLD}
+                  THEN now() + make_interval(secs => ${LOCKOUT_DURATION_SECONDS})
+                  ELSE locked_until
+                END
+              `,
+            })
+            .where(eq(users.id, user.id))
+            .returning({
+              failedLoginAttempts: users.failedLoginAttempts,
+              lockedUntil: users.lockedUntil,
+            });
+
+          // The account was not locked when we reached bcrypt (checkLockout above).
+          // Any non-null lockedUntil in RETURNING means the lock was set right now.
+          if (updated?.lockedUntil != null) {
+            void recordAudit({
+              action: AUDIT_ACTIONS.USER_ACCOUNT_LOCKED,
+              actor: { userId: user.id, email: user.email },
+              resourceType: "user",
+              resourceId: user.id,
+              metadata: {
+                failedAttempts: LOCKOUT_THRESHOLD,
+                lockedUntilEpochMs: updated.lockedUntil.getTime(),
+              },
+            });
+          }
+          return null;
+        }
 
         return {
           id: user.id,
@@ -163,7 +224,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         await ensureDefaultRole(user.id, user.email ?? null);
         await db
           .update(users)
-          .set({ lastLoginAt: new Date() })
+          .set({ lastLoginAt: new Date(), failedLoginAttempts: 0, lockedUntil: null })
           .where(eq(users.id, user.id));
       }
 

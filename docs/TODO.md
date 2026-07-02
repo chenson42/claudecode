@@ -18,11 +18,11 @@ detail lives in the linked doc, not here.
 
 - [ ] `/test` + `/test-results` skills port — in progress (doc-only)
 - [ ] Push `feat/post-login-routing-and-e2e` (2 commits ready, awaiting `/pre-push` + user push) and open the PR
-- [ ] Per-account login lockout — Phase 4 complete (implementation done), advancing to qa Phase 5 — `docs/work-log/2026-07-01-account-lockout.md`
-- [ ] `check:sql-date` tripwire — Phase 1 complete (READY WITH NOTES), advancing to architect Phase 2 — `docs/work-log/2026-07-01-sql-date-tripwire.md`
-- [ ] `cache()`-wrap `isFlagEnabled` + (pending empirical check) `cachedAuth` — Phase 1 complete (READY WITH NOTES) — `docs/work-log/2026-07-01-flag-caching.md`
-- [ ] Opportunistic expired-token GC — Phase 1 complete (READY WITH NOTES), advancing to architect Phase 2 — `docs/work-log/2026-07-01-token-gc.md`
-- [ ] `auth.local_login` + `auth.require_2fa` admin flags — Phase 1 complete (READY WITH NOTES), advancing to architect Phase 2 — `docs/work-log/2026-07-01-auth-mode-flags.md`
+- [ ] `check:sql-date` tripwire — Phase 3 complete, advancing to full-stack-developer Phase 4 — `docs/work-log/2026-07-01-sql-date-tripwire.md`
+- [ ] `cache()`-wrap `isFlagEnabled` + `cachedAuth` (Scope 1+2; empirical: 2× Tier-A fires confirmed) — Phase 3 complete, advancing to full-stack-developer Phase 4 — `docs/work-log/2026-07-01-flag-caching.md`
+- [ ] Opportunistic expired-token GC — Phase 3 complete, advancing to api-developer Phase 4 — `docs/work-log/2026-07-01-token-gc.md`
+- [ ] `auth.local_login` + `auth.require_2fa` admin flags — Phase 3 complete, advancing to api-developer Phase 4 — `docs/work-log/2026-07-01-auth-mode-flags.md`
+- [ ] pendingTaken expiresAt-filter bug (requestEmailChange cross-user collision check) — Phase 2 skipped (bug-fix variant), advancing to tech-lead Phase 3 — `docs/work-log/2026-07-01-pending-email-expiry-filter.md`
 
 ## Next Up
 
@@ -39,6 +39,7 @@ detail lives in the linked doc, not here.
 - [ ] Member-visible what's-new / changelog — V2 loop-closure: surface delivered feedback-sourced features to members (requires a member-facing surface for release notes, currently admin-only); tracked as follow-up from feedback-dev-loop pipeline — `docs/work-log/2026-07-01-feedback-dev-loop.md`
 - [ ] TOTP enrolment e2e — requires either a seeded deterministic TOTP secret (security risk — see routing feature option (c) rationale, e2e-auth-infra work-log Phase 2 Ruling 7) or external authenticator integration; deferred until a safe pattern is designed
 - [ ] Admin lock-state visibility in /admin/users — show `lockedUntil` per user row; add manual unlock action — follow-up, account-lockout Phase 2 ruling R8
+- [ ] TOTP enrollment-stranding gap — user with `twoFactorRequired=true` and no enrolled secret is redirected to /totp (verification), not /account/2fa (enrollment), and gets stuck in a redirect loop; pre-existing but elevated by seeding `require_2fa: true`; needs redirect-to-enrollment path from /totp when no secret is enrolled — auth-mode-flags Phase 3, `docs/work-log/2026-07-01-auth-mode-flags.md`
 - [ ] E2E test-data hygiene for feedback: rows submitted during e2e runs persist in the dev DB with status='new', causing the SessionStart hook to fire a banner for test artifacts on every session; add afterAll cleanup in `e2e/feedback.spec.ts` or truncate in `e2e/support/global-setup.ts` — Phase 6 follow-up, feedback-dev-loop work-log
 
 ## Done
@@ -57,3 +58,4 @@ detail lives in the linked doc, not here.
 - [x] 2026-07-01 — In-app feedback + dev-loop triage wiring — SHIP WITH NOTES (FU-1: e2e test-data hygiene) — `docs/work-log/2026-07-01-feedback-dev-loop.md`
 - [x] 2026-07-01 — Report-only CSP + HSTS preload removal — SHIP IT — `docs/work-log/2026-07-01-security-headers.md`
 - [x] 2026-07-01 — ACCESS_DENIED audit event on /access-pending bounce — SHIP IT — `docs/work-log/2026-07-01-access-denied-audit.md`
+- [x] 2026-07-01 — Per-account login lockout (5-failure → 15-min DB-persisted lock, npvitals bug fix, Gap 2–4 fixes) — SHIP IT — `docs/work-log/2026-07-01-account-lockout.md`

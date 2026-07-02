@@ -185,7 +185,7 @@ export async function consumeResetToken(input: {
 
   await db
     .update(users)
-    .set({ password: hashed })
+    .set({ password: hashed, failedLoginAttempts: 0, lockedUntil: null })
     .where(eq(users.id, userRow.id));
 
   await recordAudit({

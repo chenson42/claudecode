@@ -108,6 +108,8 @@ async function seedLocalAdmin() {
         password: hash,
         isActive: true,
         name: existing.name ?? "Local Admin",
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       })
       .where(eq(schema.users.id, existing.id));
     userId = existing.id;
@@ -167,6 +169,8 @@ async function seedMemberUser() {
         password: hash,
         isActive: true,
         name: existing.name ?? "Local Member",
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       })
       .where(eq(schema.users.id, existing.id));
     userId = existing.id;
@@ -226,6 +230,8 @@ async function seedMfaAdminUser() {
         name: existing.name ?? "Local MFA Admin",
         // Preserve twoFactorRequired=true on re-seed — do not flip it back.
         twoFactorRequired: true,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       })
       .where(eq(schema.users.id, existing.id));
     userId = existing.id;
