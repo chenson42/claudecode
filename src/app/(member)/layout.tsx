@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { cachedAuth } from "@/lib/auth/cached-auth";
 import { GlobalNav } from "@/components/shared/global-nav";
 
 // NOTE: The 2FA gate is intentionally absent here. /home is not an admin
@@ -9,7 +9,7 @@ export default async function MemberLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await cachedAuth();
   if (!session?.user) redirect("/signin?callbackUrl=/home");
   return (
     <div className="min-h-screen">

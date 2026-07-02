@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth, signOut } from "@/auth";
+import { signOut } from "@/auth";
+import { cachedAuth } from "@/lib/auth/cached-auth";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await cachedAuth();
   if (!session?.user) redirect("/signin?callbackUrl=/admin");
   if (session.user.twoFactorRequired && !session.user.twoFactorVerified) {
     redirect("/totp?callbackUrl=/admin");

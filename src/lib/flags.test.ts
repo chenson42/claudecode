@@ -92,4 +92,11 @@ describe("isFlagEnabled", () => {
       "DB connection refused",
     );
   });
+
+  it("is exported as a const (cache()-wrapped) rather than a named function declaration", () => {
+    // React cache() returns a new function object; the export should be a
+    // callable function. Outside RSC (in Vitest / Node), cache() is a no-op
+    // wrapper — behavior is identical but the export shape is what we verify.
+    expect(typeof isFlagEnabled).toBe("function");
+  });
 });

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { auth } from "@/auth";
+import { cachedAuth } from "@/lib/auth/cached-auth";
 import { db } from "@/lib/db";
 import { feedbackPromptState } from "@/lib/db/schema";
 import { FEATURES } from "@/lib/permissions";
@@ -23,10 +23,13 @@ function shouldShowFeedbackPrompt(
   return true;
 }
 
-// auth() is memoized via React cache() — calling it here after the layout
-// already called it costs nothing (same request, same cached result).
+// cachedAuth() is memoized via React cache() — calling it here after the
+// layout already called it costs nothing (same request, same cached result).
+// Note: auth() directly is NOT memoized in next-auth v5 beta.31; the
+// layout+page each calling auth() fired the Tier-A DB SELECT twice. See
+// src/lib/auth/cached-auth.ts for the empirical basis.
 export default async function HomePage() {
-  const session = await auth();
+  const session = await cachedAuth();
   const user = session!.user;
 
   const name = user.name ?? user.email ?? "there";
