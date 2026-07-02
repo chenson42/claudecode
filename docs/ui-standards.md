@@ -451,6 +451,8 @@ export default function Error({ reset }: { reset: () => void }) {
 }
 ```
 
+Unauthenticated route groups that do server-side data fetching — `(email-verify)`, `(password-reset)` — require `error.tsx`; the boundary must not redirect to `/account`, as the user may have no session. Link to `/signin` instead.
+
 **For in-component async states** (e.g., a data table that reloads on filter change), manage loading/error locally with `useState` and render an inline skeleton or error banner. Do not rely on segment-level `loading.tsx` for client-initiated re-fetches.
 
 ---
