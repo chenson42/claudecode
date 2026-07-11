@@ -21,6 +21,8 @@ detail lives in the linked doc, not here.
 
 ## Backlog
 
+- [ ] Reconcile `.env.example` as the canonical env-var inventory — `DATABASE_URL_UNPOOLED`, `AUTH_TRUST_HOST`, `UPSTASH_REDIS_REST_URL/TOKEN`, `TRUST_PROXY_HEADERS`, `RATE_LIMIT_DISABLED` referenced elsewhere but absent from it; verify each against actual `process.env` usage — follow-up from `docs/reviews/2026-07-11-agent-instruction.md`
+- [ ] Deck: check whether the review-cadence slide needs updating for the two-slot consolidation (DECISION-029) at the next `deck/slides.md` edit
 - [ ] Stale test replica: (auth)/totp/actions.test.ts tests a local copy of the pre-extraction sanitizeCallbackUrl (old /admin fallback) — retire or point at safe-callback.test.ts coverage
 
 - [ ] Admin lock-state detail page — add lock badge + unlock action to `/admin/users/[id]` — follow-up from `docs/work-log/2026-07-02-admin-lock-visibility.md` Phase 3 scope decision
@@ -30,6 +32,7 @@ detail lives in the linked doc, not here.
 
 ## Done
 
+- [x] 2026-07-11 — Instruction-layer slim: CLAUDE.md 451→~330 lines, 9 agents de-duplicated + de-drifted, handoff format single-sourced to work-log template, review cadences consolidated to two slots (DECISION-029) — `docs/work-log/2026-07-11-instruction-layer-slim.md`
 - [x] 2026-07-02 — v0.6.0 shipped: PR #4 merged to main (30 commits — member home, feedback dev-loop, admin ops suite, email reliability, security batch, 6 fixes, tooling); branch deleted via /merge-pr
 - [x] 2026-07-01 — `/test` + `/test-results` skills ported (commit 4afcc36)
 

@@ -101,7 +101,7 @@ Apply find-replace and structured edits across:
 - `src/app/layout.tsx` — `metadata.title`, `metadata.description`
 - `src/app/page.tsx` — `<h1>` heading + body copy
 - `src/app/(auth)/signin/page.tsx` — any heading copy that mentions the starter
-- `CLAUDE.md` — `## Project Overview` and `## What This Starter Gives You` sections (rewrite to describe the new project, not the starter). Keep the workflow sections (`Agent Roster`, `Development Pipeline`, `Periodic Reviews`, etc.) — those are the SDLC pattern the forker wanted.
+- `CLAUDE.md` — `## Project Overview` and `## Capability Map` sections (rewrite to describe the new project, not the starter). Keep the workflow sections (`Agent Roster`, `Development Pipeline`, `Periodic Reviews`, etc.) — those are the SDLC pattern the forker wanted.
 - `README.md` — full rewrite using the new identity. Keep the structure (Good for / Not for / What you get / The SDLC bit / Quick start / Common commands / Env vars / Forking notes / License). Update every cross-reference.
 - `deck/slides.md` frontmatter — `header`, `footer`, cover slide title (if keeping the deck)
 - `.env.example` — `RESEND_FROM_EMAIL` placeholder

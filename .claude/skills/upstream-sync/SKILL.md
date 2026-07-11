@@ -28,19 +28,7 @@ Throughout this skill "baseline" means *the canonical commit your project last m
 
 ## Known Untested Paths (read this first)
 
-This skill was developed inside the canonical starter, where the Pre-flight short-circuits to `skip — N/A in canonical starter` without exercising any of the real work. That means everything below the short-circuit has been verified *structurally* (the algorithm reads right, the failure modes write nothing, the JSON shape is correct) but never *functionally* against a live fork ↔ upstream pair.
-
-The following paths have NOT been run against real data:
-
-- The `gh api repos/<owner>/<repo>/commits` call and the per-SHA `files[]` follow-up call.
-- The `git fetch <upstream>` fallback when `gh` is unavailable.
-- The classification heuristic on real upstream commit subjects + paths.
-- The markdown punch-list rendering against real data.
-- The state-file update on a non-empty run.
-- The conflict-flagging against `personalizedPaths`.
-- The scaffolded-copy baseline strategies (Step 2, Strategies 2–4): the `merge-base` no-common-ancestor fall-through, the user-supplied starter SHA, the date-resolved baseline (`gh ... -f until=`), and the latest-canonical last resort.
-
-**If you are the first fork-owner running this skill: you are the first real test.** If something fails or produces obviously wrong output, please open an issue at `github.com/chenson42/claudecode-nextjs-starter` so future forks benefit from the fix. The honest version of this skill's status is "designed carefully, verified structurally, ready for first contact."
+Developed inside the canonical starter, where the Pre-flight short-circuits to N/A — so everything below has been verified *structurally* but never run against a live fork ↔ upstream pair: the `gh api .../commits` + per-SHA `files[]` calls, the `git fetch` fallback, the classification heuristic on real subjects/paths, the punch-list rendering, the state-file update on a non-empty run, the `personalizedPaths` conflict-flagging, and the scaffolded-copy baseline strategies (Step 2, Strategies 2–4). **If you are the first fork-owner running this skill, you are the first real test** — if something fails or produces obviously wrong output, open an issue at `github.com/chenson42/claudecode-nextjs-starter` so future forks benefit from the fix.
 
 ---
 

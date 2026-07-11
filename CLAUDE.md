@@ -2,57 +2,36 @@
 
 Guidance for Claude Code when working in the **Claude Code Starter**.
 
-**Sections:** [Project Overview](#project-overview) · [What This Starter Gives You](#what-this-starter-gives-you) · [How This User Works](#how-this-user-works) · [Stack](#stack) · [Project Layout](#project-layout) · [Agent Roster](#agent-roster) · [Development Pipeline](#development-pipeline) · [Periodic Reviews](#periodic-reviews) · [Document Naming](#document-naming) · [Workflow Rules](#workflow-rules) · [Commit Message Standards](#commit-message-standards) · [Common Commands](#common-commands) · [Key Invariants](#key-invariants)
-
 ## Project Overview
 
-The **Claude Code Starter** is a fork-and-go Next.js template for new web apps. It is also a teaching artifact for how to work with Claude Code: every file under `.claude/`, every doc in `docs/`, and the conventions in this file are meant to be read, copied, and adapted.
+The **Claude Code Starter** is a fork-and-go Next.js template for new web apps, and a teaching artifact for how to work with Claude Code: every file under `.claude/`, every doc in `docs/`, and the conventions in this file are meant to be read, copied, and adapted.
 
-Fork the starter, search-and-replace the project name, tune the brand colors in the `@theme` block of `src/app/globals.css`, fill in `.env.local`, and you have a deployable app with sign-in, an admin shell, roles and permissions, TOTP 2FA, environment feature flags, an audit log, and release notes — all wired and ready to extend.
+Fork it, search-and-replace the project name, tune the brand colors in the `@theme` block of `src/app/globals.css`, fill in `.env.local`, and you have a deployable app with sign-in, an admin shell, roles and permissions, TOTP 2FA, feature flags, an audit log, and release notes — wired and ready to extend.
 
-## What This Starter Gives You
+## Capability Map
 
-Out of the box, a fork ships with:
+The full feature catalog (with per-feature detail) lives in `README.md` → "What you get out of the box." The operational summary:
 
-- **Authentication** — NextAuth 5 (beta) with Google OAuth. JWT sessions carry the user's roles, features, and 2FA state.
-- **TOTP 2FA** — Enrolment with QR code, verification, recovery codes, and a trusted-device cookie. Secrets are encrypted at rest with `AUTH_TOTP_ENCRYPTION_KEY`.
-- **Roles and permissions** — A `roles` ↔ `features` ↔ `users` model. `FEATURES` in `src/lib/permissions.ts` is the static catalog; `hasFeature()` is the runtime check. Permissions are *separate* from feature flags.
-- **Feature flags** — A `feature_flags` table with an environment-level toggle and rollout percent. `isFlagEnabled(key)` is the runtime check.
-- **Admin shell** — `/admin` with subpages for users, roles, flags, docs, and 2FA management. Gated by the `admin.dashboard` feature.
-- **Audit log** — Append-only `audit_events` table. Security-sensitive mutations write rows here.
-- **Release notes viewer** — Admin docs page renders versioned release notes from `docs/release-notes/vX.Y.md`.
-- **In-app feedback loop** — Members submit suggestions and bug reports from `/home` (daily prompt card, once per local day) and `/account` (permanent form). A `SessionStart` hook counts unread submissions and surfaces a triage banner at the start of each coding session. Accepted items spin into the six-phase pipeline with a Source block in the work-log; delivered items are marked `done` at Phase 6. The feedback body never enters the LLM context — the hook emits only the count.
-- **Member home** — post-login landing at `/home` with a global nav (conditional Admin link); every `callbackUrl` sanitized, falling back to `/home`.
-- **What's-new changelog** — admins publish entries at `/admin/whats-new`; members see them on `/home` and `/whats-new`. Closes the feedback loop user-visibly (Workflow Rule 13).
-- **Durable email queue** — sends persist first and retry with backoff via a `CRON_SECRET`-gated Vercel cron; Resend delivery webhook fills per-message delivery status; `/admin/email-queue` viewer with retry. A daily maintenance cron sweeps expired tokens.
-- **Audit log viewer** — `/admin/audit`, filterable by action and actor; `recordAudit()` captures actor, IP, and user-agent on every event.
-- **Account lockout** — 5 failed passwords lock credentials sign-in for 15 minutes (enumeration-safe, OAuth-exempt); admins see and clear locks on `/admin/users`.
-- **Turnstile CAPTCHA** — endpoint-level bot protection on sign-in and forgot-password; a complete no-op until two env vars are set.
-- **Auth-mode flags** — `auth.local_login` (OAuth-only mode, gating `authorize()` itself) and `auth.require_2fa` (org-wide 2FA switch), both fail-open, toggled at `/admin/flags`.
-- **Report-only CSP** — grounded in the app's real resource loads, with a documented fork-tightening path to enforcement.
-- **Route protection** — `src/proxy.ts` enforces the auth + 2FA gate at the edge (Next 16's `proxy.ts` convention, which replaces the deprecated `middleware.ts`).
-- **Seed script** — `scripts/seed.ts` creates admin and member roles, seeds every feature in `FEATURE_CATALOG`, and registers a demo feature flag.
-- **Self-serve account page** — `/account` lets signed-in users update their display name, change their email (triggers re-verification), change their password, manage per-user TOTP at `/account/2fa`, and reach a delete-account skeleton.
-- **Forgot-password flow** — `/forgot-password` accepts an email and sends a reset link; `/reset-password` accepts the token and sets a new password.
-- **Toast notifications** — Sonner `<Toaster>` is mounted in the root layout. Server actions return `ActionResult<T>` (from `src/types/actions.ts`); components call `toast.success()` / `toast.error()` on the result.
-- **Rate limiting** — `src/lib/rate-limit.ts` provides in-memory sliding-window limiting for server actions; swap in Upstash Redis for multi-instance deployments by setting `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`.
-- **Timezone-safe date rendering** — `<FormattedDate>` from `src/components/shared/formatted-date.tsx` renders any timestamp in the *viewer's* TZ; never call `toLocale*()` directly (an ESLint rule enforces this).
-- **Commit-message standards** — Conventional-Commits prefix + mandatory `Caught-By` / `Discovered-In` trailers on `fix:` commits, enforced by a git hook installed via `npm install`. `npm run stats:escape` gives the weekly retrospective a 30-day escape-rate breakdown.
+- **Auth & accounts** — NextAuth 5 beta (Google OAuth + credentials; JWT sessions carry roles, features, 2FA state) · TOTP 2FA with QR enrolment, recovery codes, trusted-device cookie · self-serve `/account` (profile, email change + re-verification, password change, per-user 2FA at `/account/2fa`, delete skeleton) · forgot/reset-password flow · account lockout (5 failed passwords → 15-min lock; enumeration-safe, OAuth-exempt; admins clear locks on `/admin/users`) · Turnstile CAPTCHA on sign-in + forgot-password (no-op until keyed) · auth-mode flags `auth.local_login` and `auth.require_2fa` (both fail-open, toggled at `/admin/flags`).
+- **Authorization** — roles ↔ features ↔ users permissions (`src/lib/permissions.ts`) and environment feature flags (`src/lib/flags.ts`). Two distinct concepts — see Key Invariants → Permissions vs Flags.
+- **Admin shell** — `/admin` subpages: users, roles, flags, docs (release-notes viewer), 2FA, feedback triage, what's-new CRUD, email-queue viewer, audit viewer. Gated by `admin.dashboard`.
+- **Member surface** — post-login landing `/home` with global nav (conditional Admin link) · what's-new changelog on `/home` and `/whats-new` · in-app feedback loop (daily prompt card on `/home`, permanent form on `/account`) with a SessionStart triage hook — see Key Invariants → Feedback and Dev-Loop Wiring.
+- **Infrastructure** — append-only `audit_events` via `recordAudit()` in `src/lib/audit.ts` (captures actor, IP, user-agent) · durable email queue (persist-first, `CRON_SECRET`-gated Vercel cron retry, Resend delivery webhook, daily token-GC cron) · report-only CSP · edge route gate `src/proxy.ts` (auth + 2FA; Next 16 `proxy.ts` replaces deprecated `middleware.ts`) · in-memory rate limiting in `src/lib/rate-limit.ts` (Upstash env vars swap in Redis) · Sonner toasts; server actions return `ActionResult<T>` from `src/types/actions.ts` · `<FormattedDate>` for timezone-safe dates · seed script `scripts/seed.ts` · commit standards enforced by a git hook installed via `npm install`.
 
 ## How Claude Should Behave in This Repo
 
 These rules apply regardless of who's forked the project or how they've configured Claude Code:
 
-- **Re-render the deck whenever `deck/slides.md` changes.** After editing `deck/slides.md`, run `npm run deck` to refresh both outputs. `deck/slides.pdf` IS committed to the repo (so viewers can download it from GitHub without installing Marp) — re-render *and re-commit it* in the same change as the source edit. `deck/slides.pptx` stays gitignored. If the render fails, fix the cause; don't leave stale outputs behind.
+- **Re-render the deck whenever `deck/slides.md` changes.** Run `npm run deck` to refresh both outputs. `deck/slides.pdf` IS committed (so viewers can download it without installing Marp) — re-render *and re-commit it* in the same change as the source edit. `deck/slides.pptx` stays gitignored. If the render fails, fix the cause; don't leave stale outputs behind.
 - **Be deliberate with destructive commands.** A wrong `git reset --hard` or `npm run db:push -- --force` is hard to undo. State what you're about to do before non-trivial commands so the user has a chance to interrupt.
 - **Wait for explicit approval before committing or pushing.** Pre-commit and pre-push are user gestures, not background tasks.
 - **Never push without going through `/pre-push`.** The checklist exists so the agent doesn't ship broken builds.
 
 ## Original Author's Setup (informational)
 
-The author of this starter (`chenson42@gmail.com`) runs Claude Code with `--dangerously-skip-permissions` and expects Claude to **run frequent commands directly** rather than asking the user — dev servers, builds, typechecks, watchers, log tails, db pushes all happen in Claude's hands. The exception is genuinely interactive commands (e.g. `gcloud auth login`), which bounce back to the user with the `! ` prefix hint.
+The author (`chenson42@gmail.com`) runs Claude Code with `--dangerously-skip-permissions` and expects Claude to **run frequent commands directly** — dev servers, builds, typechecks, watchers, log tails, db pushes. The exception is genuinely interactive commands (e.g. `gcloud auth login`), which bounce back to the user with the `! ` prefix hint.
 
-If you've forked this starter and run Claude Code with the default permission prompts, ignore the above — your existing prompt-before-acting flow is the right behavior for you. The "Behave in This Repo" rules above are the universal ones.
+If you've forked this starter and run Claude Code with default permission prompts, ignore the above — prompt-before-acting is right for you. The "Behave in This Repo" rules are the universal ones.
 
 ## Stack
 
@@ -67,6 +46,8 @@ If you've forked this starter and run Claude Code with the default permission pr
 - **Vercel** target deployment (the starter is platform-agnostic but ships Vercel-ready)
 
 ## Project Layout
+
+This tree is the canonical map of the repo — agent files point here rather than maintaining their own copies.
 
 ```
 src/
@@ -86,7 +67,7 @@ src/
 │   ├── (password-reset)/forgot-password/             — Request a password-reset link
 │   ├── (password-reset)/reset-password/              — Consume token + set new password
 │   ├── access-pending/      — Landing for authenticated users with no roles
-│   ├── api/                 — Route handlers (auth callbacks, admin APIs)
+│   ├── api/                 — Route handlers (auth callbacks, admin APIs, api/webhooks/<provider>)
 │   ├── page.tsx             — Public landing page
 │   └── layout.tsx           — Root layout
 ├── lib/
@@ -94,11 +75,11 @@ src/
 │   ├── auth/                — NextAuth config
 │   ├── permissions.ts       — FEATURES catalog + hasFeature()
 │   ├── flags.ts             — isFlagEnabled()
+│   ├── audit.ts             — recordAudit() helper (actor, IP, user-agent)
 │   └── two-factor.ts        — TOTP encrypt/decrypt + verify
 ├── components/
 │   ├── ui/                  — shadcn primitives (auto-generated; don't hand-edit)
 │   └── shared/              — Cross-cutting components (e.g., <FormattedDate>, <FeedbackForm>)
-│       └── feedback-form.tsx       — Shared feedback submission form (client)
 ├── auth.ts                  — NextAuth entry (re-exported across the app)
 ├── proxy.ts                 — Next 16 route gate (admin + 2FA enforcement)
 └── types/                   — Ambient type declarations
@@ -109,7 +90,7 @@ docs/
 ├── TODO.md                  — Backlog & follow-up ledger (reconcile in the same commit as the work)
 ├── ui-standards.md          — UI conventions + pre-merge UX audit checklist (Phase 5 reference)
 ├── decisions.md             — ADR-style decision log
-├── work-log/                — Per-feature pipeline tracking
+├── work-log/                — Per-feature pipeline tracking (_template.md is the canonical format)
 ├── reviews/                 — Review log + detail files
 └── release-notes/           — vX.Y.md files surfaced in admin docs
 .claude/
@@ -126,7 +107,7 @@ Agents live in `.claude/agents/`. Spawn the right one for the phase.
 |-------|---------------|---------------|
 | **analyst** | Phase 1 & 6 | Functional refinement before design; shipped-vs-intent review after QA. |
 | **architect** | Phase 2 | New subdirectories, npm dependencies, structural changes. |
-| **tech-lead** | Phase 3 | For any Feature / bug fix or Polish / visual / refactor class request (see Classification table); authors the design doc. |
+| **tech-lead** | Phase 3 | Any Feature / bug-fix or Polish-class request (see Classification); authors the design doc. |
 | **database-admin** | Phase 4 (schema) | `schema.ts` changes, Drizzle Kit work, indexes. |
 | **api-developer** | Phase 4 (server) | Route handlers, server actions, business logic. |
 | **ux-developer** | Phase 4 (client) | React components, admin pages, forms. |
@@ -134,7 +115,7 @@ Agents live in `.claude/agents/`. Spawn the right one for the phase.
 | **deployment-engineer** | Pre-deploy | Production build verification, env vars, build failures. |
 | **qa** | Phase 5 | Test verification, typecheck, regression tests. |
 
-**The full six-phase pipeline is defined below. Every feature flows through it. Work is not complete until analyst issues SHIP IT in Phase 6.**
+**Every feature flows through the six-phase pipeline below. Work is not complete until analyst issues SHIP IT in Phase 6.**
 
 When handing off between phases, preserve the prior phase's full output in the work-log. Do not summarize away the analyst's gaps or the architect's invariant rulings.
 
@@ -153,34 +134,7 @@ Before editing a file, creating a branch, or invoking an implementer agent, clas
 
 If the request is ambiguous, default to **Feature**. Do not invent a lower classification to avoid the pipeline.
 
-Every non-trivial change flows through six phases. Loop-backs are expected.
-
-```
-Phase 1            Phase 2            Phase 3
-─────────          ─────────          ─────────
-analyst    ──►    architect   ──►    tech-lead
-Functional         Architectural      Technical
-refinement         review             design
-   ▲                                    │
-   │                                    ▼
-   │                                  Phase 4
-   │                                  ─────────
-   │                                  Implementer
-   │                                  (db-admin |
-   │                                   api-developer |
-   │                                   ux-developer |
-   │                                   full-stack)
-   │                                    │
-   │                                    ▼
-Phase 6            Phase 5
-─────────          ─────────
-analyst    ◄──    qa
-Shipped vs         Test
-intent             verification
-sign-off
-```
-
-A loop-back from any later phase returns to the **earliest** phase where the failure originated, not just the previous phase.
+Phases run 1 → 2 → 3 → 4 → 5 → 6. Loop-backs are expected, and a loop-back from any later phase returns to the **earliest** phase where the failure originated, not just the previous phase.
 
 ### Phase 1 — Functional Refinement (analyst)
 
@@ -215,14 +169,14 @@ A loop-back from any later phase returns to the **earliest** phase where the fai
 | React components, pages, forms | **ux-developer** |
 | Spans server + client and is small | **full-stack-developer** |
 
-**Gate:** Typecheck passes. The build passes. `npm run check:audit` reports zero violations. No native browser dialogs. No `console.log` left in production paths. All invariants honored. Audit events written for security-sensitive mutations. **For any feature that touches `src/auth.ts`, `src/app/(auth)/`, `src/app/api/auth/`, or `src/lib/auth/`, a running-server e2e smoke covering the full login path (including an MFA-enrolled user) is required before Phase 5 can begin — this catches module-resolution defects that unit tests cannot (see the originating downstream incident referenced in the work-log).**
+**Gate:** Typecheck and build pass. `npm run check:audit` reports zero violations. No native browser dialogs. No `console.log` left in production paths. All invariants honored. Audit events written for security-sensitive mutations. **For any feature that touches `src/auth.ts`, `src/app/(auth)/`, `src/app/api/auth/`, or `src/lib/auth/`, a running-server e2e smoke covering the full login path (including an MFA-enrolled user) is required before Phase 5 can begin — module-resolution defects are invisible to unit tests.**
 **Loop-back:** Design unbuildable returns to Phase 3. Architectural problem discovered returns to Phase 2.
 
 ### Phase 5 — Test Verification (qa)
 
 **Trigger:** Implementer reports Phase 4 complete.
-**Output:** Build Verification Report in the work-log.
-**Gate:** Verdict must be `PASS` or `BLOCKED`. **On auth-touching features (see Phase 4 gate), a `PASS` verdict requires that the e2e suite was run against a real dev server with an MFA-enrolled seeded user. A deferred or skipped e2e check produces `BLOCKED`, not `PASS` — a deferred advisory is not a green light.**
+**Output:** Verification report in the work-log (format: `docs/work-log/_template.md` Phase 5 section).
+**Gate:** Verdict must be `PASS` or `BLOCKED`. **On auth-touching features (see Phase 4 gate), `PASS` requires the e2e suite ran against a real dev server with an MFA-enrolled seeded user. A deferred or skipped e2e check produces `BLOCKED`, not `PASS` — a deferred advisory is not a green light.**
 **Loop-back:** `FAIL` returns to the implementer (Phase 4) with failing tests cited `file:line`. `BLOCKED` returns to the user with the unmet prerequisite named. If a failure reveals a design flaw, escalate to Phase 3.
 
 ### Phase 6 — Shipped vs Intent (analyst)
@@ -247,43 +201,28 @@ A loop-back from any later phase returns to the **earliest** phase where the fai
 
 ### Per-Feature Tracking
 
-Every piece of work gets a work-log file at `docs/work-log/YYYY-MM-DD-<slug>.md` (use the date the work started) from `docs/work-log/_template.md`. The work-log is the source of truth for pipeline state — Claude reads it at session start to determine where the work stands and which agent to invoke next.
+Every piece of work gets a work-log file at `docs/work-log/YYYY-MM-DD-<slug>.md` (date the work started), created from `docs/work-log/_template.md`. **The template's per-phase sections are the canonical handoff format** — agents fill in their phase's section and update the Per-Phase Status table; they do not invent parallel formats. The work-log is the source of truth for pipeline state — Claude reads it at session start to determine where the work stands and which agent to invoke next.
 
 ## Periodic Reviews
 
-Eight reviews run on rolling cadences to keep the codebase, docs, security posture, test coverage, instruction layer, dependency footprint, upstream drift, and the development process itself from drifting.
+Reviews are bundled into two recurring slots plus the fork-only syncs (consolidated 2026-07-11, DECISION-029 — eight weeks of history showed the previous eight independent cadences ran in batch sessions anyway). Each review type still gets its own line in `docs/reviews/log.md`, so per-type history is preserved. What each review covers is defined in the owner's agent file.
 
-| Review | Cadence | Owner | Why it exists |
-|--------|---------|-------|---------------|
-| **Test coverage** | 7 d | qa | Coverage drifts faster than any other axis on a fast-moving project; a weekly sweep catches gaps while the context for the missing tests is still recent. |
-| **Retrospective** | 7 d | all agents → tech-lead synthesizes | Pipeline efficacy needs short feedback loops — a weekly retrospective produces concrete edits to agents and to this file before bad patterns calcify. |
-| **Code** | 30 d | architect | Complexity hotspots, dead code, and quiet violations of invariants accumulate over weeks; a monthly pass keeps the codebase shaped like the starter is meant to be shaped. |
-| **Documentation** | 30 d | tech-lead | Docs drift silently — a monthly audit catches stale environment-variable lists, broken cross-links, and CLAUDE.md sections that no longer match reality. |
-| **Security** | 30 d | api-developer + database-admin | A monthly sweep of auth boundaries, secret handling, dependency CVEs, and OWASP surface area catches the slow drift between active security incidents. |
-| **Agent & instruction** | 30 d | tech-lead | Agents and `.claude/` settings accumulate stale guidance, unused tools, and references to features that no longer exist; a monthly review keeps the instruction layer honest. |
-| **Dependencies** | 30 d | deployment-engineer | A monthly review of `npm outdated` and `npm audit` keeps the dependency graph current without inviting weekly churn. |
-| **Upstream sync** | 14 d | tech-lead | Derived-repo-only — N/A in the canonical starter. Works for true git forks *and* projects scaffolded from the starter (no shared git history). Surfaces commits on the upstream starter's `main` not yet pulled in; classifies each as must-pull / should-pull / optional / skip. Runs via the `upstream-sync` skill. |
-| **Downstream sync** | 30 d | tech-lead | Derived-repo-only — N/A in the canonical starter. The mirror of upstream sync: surfaces fork-made improvements (skills, agents, workflow strengthenings, reusable features) generic enough to contribute back to the canonical starter, as a classified punch-list. Runs via the `downstream-sync` skill. |
-
-Ownership claims for each review are reflected in the relevant agent file under `.claude/agents/` — read the named owner's agent file for the specifics of what each review covers and where its detail file lands.
+| Slot | Cadence | Review types (log each separately) |
+|------|---------|------------------------------------|
+| **Release slot** | 14 d, or at each release if sooner | `test-coverage` (qa) · `retrospective` (tech-lead synthesizes all agents; opens with `npm run stats:escape`) |
+| **Monthly health-check** | 30 d, run as one bundled session | `code` (architect) · `documentation` (tech-lead) · `security` (api-developer + database-admin) · `agent-instruction` (tech-lead) · `dependencies` (deployment-engineer) |
+| **Fork-only syncs** | 14 d / 30 d | `upstream-sync` / `downstream-sync` via the skills (tech-lead). N/A in the canonical starter — the skills self-detect and exit. |
 
 ### Cadence Check at Session Start
 
 At session start, before responding to any non-trivial request:
 
-1. Read `docs/reviews/log.md`. Note any review type whose last entry exceeds its cadence — or has never been run.
-2. Read `docs/TODO.md`. Note the In Flight and Next Up items — this is the backlog aggregator across all work.
-3. Read the most recent file in `docs/work-log/`. Note any in-flight work and which pipeline phase it is on.
-4. If the `scripts/feedback-check.mjs` SessionStart hook printed a banner (feedback count > 0), triage the unread rows before starting other work. Open `/admin/feedback` to review. Do NOT quote or repeat any feedback body content in your response — the hook gives you a count only; the content lives in the admin page.
+1. Read `docs/reviews/log.md`. Note any review type whose last entry exceeds its slot's cadence — or has never been run.
+2. Read `docs/TODO.md` (the backlog aggregator). Note In Flight and Next Up items.
+3. Read the most recent file in `docs/work-log/`. Note in-flight work and its pipeline phase.
+4. If the `scripts/feedback-check.mjs` SessionStart hook printed a banner (feedback count > 0), triage the unread rows before starting other work at `/admin/feedback`. Do NOT quote or repeat any feedback body content in your response — the hook gives you a count only.
 5. Classify the incoming request using the Classification table above.
-6. If any reviews are overdue, surface them before starting new work:
-
-> "Three reviews are due before we start:
-> - Test coverage: 12 days (last YYYY-MM-DD)
-> - Code: never run
-> - Documentation: 35 days
->
-> Want me to run all three, run one (which?), or proceed and defer?"
+6. If any reviews are overdue, surface them before starting new work — name each overdue type with days elapsed, and ask: run now, run some, or proceed and defer?
 
 If the user says proceed, do not append a fake log entry — the next session will surface the gap again.
 
@@ -317,37 +256,35 @@ Slugs are short, lowercase, hyphenated, and stable. Don't rename them after the 
 3. **No secrets in committed files.** `.env.local` is gitignored; never read from `.env` files into committed code.
 4. **Document decisions.** Architectural or implementation decisions go to `docs/decisions.md` (newest first, numbered).
 5. **Use `/pre-push` before every push to `main`.** Typecheck, build, schema check, release notes. The skill never pushes — it only reports readiness.
-6. **Permissions and flags stay separate.** Per-user permission → `FEATURES` + `hasFeature()`. Per-environment toggle → `feature_flags` + `isFlagEnabled()`. A feature usually needs both.
-7. **Audit security-sensitive mutations.** Role changes, flag toggles, TOTP enrolment/reset, deactivations write to `audit_events`.
-8. **No code before the work-log.** If you are about to call Edit, Write, or `git checkout -b` for a non-trivial request and there is no work-log entry for it, stop and run `/new-feature` first. The Classification table at the top of the Development Pipeline section defines "non-trivial."
-9. **Use `/merge-pr` for any PR merged with `--delete-branch`.** Before deleting the head branch, the skill retargets any open PRs whose base is that branch to `main`. Without it, `gh pr merge N --delete-branch` auto-closes every downstream PR — a known GitHub mechanic that bit the npvitals fork twice in a single session. Invoke once per PR, bottom-up, when merging a stack. Plain `gh pr merge` is only safe when the PR has no dependents *and* you're not deleting the branch.
-10. **Keep `docs/TODO.md` reconciled in the same commit as the work.** It is the single backlog aggregator. Shipping something? Move its line to Done (with date) in that commit. Deferring something, discovering a follow-up, or accepting a review punch-list item? Add a line in that commit. Phase 6 `SHIP WITH NOTES` follow-ups land here, not just in the work-log. A commit that changes what's open without touching `docs/TODO.md` is incomplete — `/pre-push` flags it.
-11. **Never amend or force-push to diagnose an external-system failure.** When the same commit suddenly yields a different deploy or CI result, the external system changed — not your code. Get ground truth from the failing service's dashboard before touching git history. Re-authoring commits fixes nothing when the cause is a Vercel account issue, a CI runner update, or a third-party integration outage.
-12. **Mark feedback rows at delivery.** When a Phase 6 analyst closes a feature that originated from in-app member feedback, update the `feedback` row status from `triaged` to `done` at Phase 6 close. The work-log's Source block (see the template) records the row UUID so it can be found. Do not mark `done` before Phase 6 — the row stays `triaged` while the feature is in flight.
-13. **What's-new advisory at SHIP IT.** At Phase 6, if the shipped feature introduces member-visible behavior, consider publishing a `whats_new_entries` entry to announce it (admin CRUD at `/admin/whats-new`). Not required for internal admin tooling, infrastructure changes, or bug fixes.
+6. **Permissions and flags stay separate.** See Key Invariants → Permissions vs Flags.
+7. **Audit security-sensitive mutations.** Role changes, flag toggles, TOTP enrolment/reset, deactivations write to `audit_events` (use `recordAudit()`).
+8. **No code before the work-log.** If you are about to call Edit, Write, or `git checkout -b` for a non-trivial request and there is no work-log entry for it, stop and run `/new-feature` first. The Classification table defines "non-trivial."
+9. **Use `/merge-pr` for any PR merged with `--delete-branch`.** Before deleting the head branch, the skill retargets open PRs based on that branch to `main` — otherwise GitHub auto-closes every downstream PR (this bit the npvitals fork twice in one session). Invoke once per PR, bottom-up, when merging a stack. Plain `gh pr merge` is only safe when the PR has no dependents *and* you're not deleting the branch.
+10. **Keep `docs/TODO.md` reconciled in the same commit as the work.** Shipping something? Move its line to Done (with date) in that commit. Deferring, discovering a follow-up, or accepting a review punch-list item? Add a line in that commit. Phase 6 `SHIP WITH NOTES` follow-ups land here, not just in the work-log. A commit that changes what's open without touching `docs/TODO.md` is incomplete — `/pre-push` flags it.
+11. **Never amend or force-push to diagnose an external-system failure.** When the same commit suddenly yields a different deploy or CI result, the external system changed — not your code. Get ground truth from the failing service's dashboard before touching git history.
+12. **Mark feedback rows at delivery.** When Phase 6 closes a feature that originated from in-app member feedback, update the `feedback` row from `triaged` to `done` (the work-log's Source block records the row UUID). Not before Phase 6 — the row stays `triaged` while in flight.
+13. **What's-new advisory at SHIP IT.** At Phase 6, if the shipped feature introduces member-visible behavior, consider publishing a `whats_new_entries` entry (admin CRUD at `/admin/whats-new`). Not required for internal admin tooling, infrastructure, or bug fixes.
 
 ## Commit Message Standards
 
-Every commit must follow this format on the first line:
+Every commit's first line:
 
     <prefix>(<optional-scope>): <description (1–100 chars)>
 
-Allowed prefixes: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `style`, `perf`, `build`, `ci`.
+Allowed prefixes: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `style`, `perf`, `build`, `ci`. Merge, revert, and release commits are exempt from validation.
 
-Merge commits (`Merge ...`), revert commits (`Revert ...`), and release commits (`Release ...`) are exempt from validation.
-
-**Bug-fix trailers.** Every `fix:` commit must include both trailers in the commit body (after a blank line):
+**Bug-fix trailers.** Every `fix:` commit must include both trailers in the body (after a blank line):
 
     Caught-By: automated-test | agent-review | human-review | production
     Discovered-In: Phase-1 | Phase-2 | Phase-3 | Phase-4 | Phase-5 | Phase-6 | post-merge | production
 
-`Caught-By` classification rule: if CI would have caught the bug without any agent judgment, use `automated-test`. If an agent had to decide to run a non-mandatory check, use `agent-review`.
+`Caught-By` rule: if CI would have caught the bug without any agent judgment, use `automated-test`; if an agent had to decide to run a non-mandatory check, use `agent-review`.
 
-**Mixed-commit rule.** One commit, one prefix. A commit that adds a feature and also fixes a bug must be split into two separate commits. The validator accepts only one prefix per subject line; there is no compound prefix.
+**Mixed-commit rule.** One commit, one prefix. A commit that adds a feature and fixes a bug must be split — there is no compound prefix.
 
-**Hook bypass.** Never use `git commit --no-verify`. If the hook rejects a valid commit, fix the hook, not the bypass. The `npm run stats:escape` report shows a "Missing trailers (bypass)" count — this number should be zero in every retrospective.
+**Hook bypass.** Never use `git commit --no-verify`. If the hook rejects a valid commit, fix the hook. The `npm run stats:escape` "Missing trailers (bypass)" count should be zero in every retrospective.
 
-**Running the stats.** `npm run stats:escape` prints a 30-day escape-rate breakdown. The tech-lead runs this at the start of each weekly retrospective and copies the output into the retrospective work-log section.
+**Running the stats.** `npm run stats:escape` prints a 30-day escape-rate breakdown. Tech-lead runs it at the start of each retrospective and copies the output into the retrospective detail file.
 
 ## Common Commands
 
@@ -367,47 +304,24 @@ npm run db:seed      # Seed roles, features, and the demo flag
 npm run check:audit  # Tripwire: every mutation in actions.ts files must reference an AUDIT_ACTIONS key
 npm run check:sql-date # Tripwire: bans sql<Date> typings (neon-http returns strings for raw-SQL dates)
 npm run check        # Both tripwires in sequence
-npm run stats:escape # 30-day escape-rate report (per-channel fix breakdown for the weekly retrospective)
+npm run stats:escape # 30-day escape-rate report (per-channel fix breakdown for the retrospective)
 npm run deck         # Render deck/slides.md → slides.pptx + slides.pdf
 npm run deck:pptx    # PowerPoint only
 npm run deck:pdf     # PDF only
 npm run deck:html    # Live-reload HTML preview
 ```
 
-Generate an `AUTH_SECRET` with:
-
-```bash
-openssl rand -base64 32
-```
+Generate an `AUTH_SECRET` with `openssl rand -base64 32`.
 
 ## Key Invariants
 
 ### Server / Client Boundary
 
-Next.js Server Components are the default. Add `'use client'` only when you need event handlers, hooks, refs, or browser APIs.
+Next.js Server Components are the default. Add `'use client'` only when you need event handlers, hooks, refs, or browser APIs. Server actions are marked `'use server'`; they never trust inputs without validation and always re-check session and permissions inside the action body.
 
-```typescript
-// CORRECT — Server Component (default)
-export default async function Page() {
-  const session = await auth();
-  return <main>{session?.user?.email}</main>;
-}
+### The Proxy Cannot Import `@/lib/db`
 
-// CORRECT — Client Component (interactivity)
-"use client";
-export function Toggle({ value }: { value: boolean }) {
-  const [v, setV] = useState(value);
-  return <button onClick={() => setV(!v)}>...</button>;
-}
-```
-
-### Server Actions
-
-Mark with `'use server'` at the top of the file or function. They run on the server; never trust their inputs without validation; always re-check session and permissions inside the action body.
-
-### The Middleware Cannot Import `@/lib/db`
-
-`src/proxy.ts` runs on the Edge runtime. It cannot import node-only modules. Keep DB access in route handlers and server actions; let the proxy check JWT claims only.
+`src/proxy.ts` runs on the Edge runtime and cannot import node-only modules. Keep DB access in route handlers and server actions; the proxy checks JWT claims only.
 
 ### Schema Is the Source of Truth
 
@@ -420,32 +334,32 @@ Mark with `'use server'` at the top of the file or function. They run on the ser
 | Permission | `FEATURES` + `hasFeature()` | "Is this *user* allowed to do X?" |
 | Flag | `feature_flags` + `isFlagEnabled()` | "Is feature X *turned on* for this environment?" |
 
-They are not interchangeable. A new admin action almost always needs a new permission. A new in-progress feature usually needs a flag.
+Not interchangeable. A new admin action almost always needs a new permission. A new in-progress feature usually needs a flag. Many features need both. This section is the single source for this rule — agent files point here.
 
 ### TOTP Encryption Key
 
-The `AUTH_TOTP_ENCRYPTION_KEY` is a 32-byte secret used to AES-GCM-encrypt the user's TOTP seed at rest. **Rotating this key invalidates every enrolled TOTP secret in the database.** Do not rotate it casually.
+`AUTH_TOTP_ENCRYPTION_KEY` is a 32-byte secret that AES-GCM-encrypts TOTP seeds at rest. **Rotating it invalidates every enrolled TOTP secret in the database.** Do not rotate it casually.
 
 ### No Secrets in Committed Files
 
-`.env.local`, OAuth keys, the AUTH_SECRET, the TOTP key — none of these belong in git. `.gitignore` already excludes `.env*` except `.env.example`. Don't work around it.
+`.env.local`, OAuth keys, `AUTH_SECRET`, the TOTP key — none belong in git. `.gitignore` excludes `.env*` except `.env.example`. Don't work around it. `.env.example` is the canonical inventory of environment variables.
 
 ### Timezone-Safe Date Rendering
 
-Never call `toLocaleString()`, `toLocaleDateString()`, or `toLocaleTimeString()` directly in components. On Vercel (UTC), server-rendered timestamps always show UTC to the viewer. Use `<FormattedDate value={...} mode="date|datetime" />` from `src/components/shared/formatted-date.tsx` instead — it SSR-renders an ISO fallback and swaps in the viewer's local timezone after mount. An ESLint rule enforces this; the primitive file is the only exemption.
+Never call `toLocaleString()` / `toLocaleDateString()` / `toLocaleTimeString()` directly in components — on Vercel (UTC), server-rendered timestamps show UTC to every viewer. Use `<FormattedDate value={...} mode="date|datetime" />` from `src/components/shared/formatted-date.tsx` (SSR-renders an ISO fallback, swaps in the viewer's timezone after mount). An ESLint rule enforces this; the primitive file is the only exemption.
 
 ### Post-Login Landing = /home
 
-After a successful sign-in (Credentials or Google OAuth), users land at `/home`. The default `callbackUrl` in `src/app/(auth)/signin/page.tsx` and the fallback in `src/lib/auth/safe-callback.ts` are both `/home`. Do not change either to `/admin` without explicit product intent — most users don't have `admin.dashboard` and will land on `/access-pending` if sent to `/admin`.
+After a successful sign-in (Credentials or Google OAuth), users land at `/home`. The default `callbackUrl` in `src/app/(auth)/signin/page.tsx` and the fallback in `src/lib/auth/safe-callback.ts` are both `/home`. Do not change either to `/admin` without explicit product intent — most users lack `admin.dashboard` and would land on `/access-pending`.
 
-The 2FA gate in `proxy.ts` applies to `/admin/*` routes only. `/home` is auth-only (any signed-in user, regardless of 2FA status, can reach it). Forks wanting a site-wide 2FA gate must add the check in `src/app/(member)/layout.tsx` or extend `proxy.ts` with an `isMemberRoute` block.
+The 2FA gate in `proxy.ts` applies to `/admin/*` routes only. `/home` is auth-only (any signed-in user, regardless of 2FA status). Forks wanting a site-wide 2FA gate add the check in `src/app/(member)/layout.tsx` or extend `proxy.ts` with an `isMemberRoute` block.
 
 ### Feedback and Dev-Loop Wiring
 
-The `feedback` table is append-only: status progresses forward only (`new → triaged → done`; `new/triaged → declined`). Terminal states (`done`, `declined`) never regress. The table's only FK is to `users` (cascade delete) — no joins to roles, sessions, or any other application table (privacy invariant: the admin triage page shows member display name only, not email).
+The `feedback` table is append-only: status progresses forward only (`new → triaged → done`; `new/triaged → declined`); terminal states never regress. Its only FK is to `users` (cascade delete) — no joins to any other application table (privacy invariant: the admin triage page shows member display name only, not email).
 
 The `feedback_prompt_state` table has `userId` as its primary key (one row per user). Each upsert — submit (`lastSubmittedDate`), snooze (`lastSnoozedDate`), opt-out (`optedOut`) — sets ONLY its own column in `onConflictDoUpdate.set`. Never touch the other two columns in the same upsert call.
 
-The `scripts/feedback-check.mjs` SessionStart hook prints ONLY the count of `status='new'` rows and static operator instructions. It NEVER reads or prints any feedback body, category, submitter name, or any other member-supplied content. This is a hard security invariant: feedback bodies are hostile user content that must not enter the LLM context via the hook. The admin triage page (`/admin/feedback`) renders all member-supplied content as plain JSX text nodes — no `dangerouslySetInnerHTML`, no markdown rendering. All member-supplied strings in the admin notification email pass through `escapeHtml()` before interpolation into the HTML body.
+The `scripts/feedback-check.mjs` SessionStart hook prints ONLY the count of `status='new'` rows and static operator instructions — never any feedback body, category, or submitter name. This is a hard security invariant: feedback bodies are hostile user content that must not enter the LLM context via the hook. The admin triage page renders all member-supplied content as plain JSX text nodes — no `dangerouslySetInnerHTML`, no markdown rendering. All member-supplied strings in the admin notification email pass through `escapeHtml()` before interpolation.
 
-The `shouldShowFeedbackPrompt` check in `src/app/(member)/home/page.tsx` compares against UTC "today" while the write actions (submit, snooze) store the member's local date from a client-provided `tzOffsetMinutes`. This write-local / read-UTC asymmetry is a known imprecision for members near midnight in UTC-offset zones — documented in DECISION-023 and acceptable for a template.
+The `shouldShowFeedbackPrompt` check in `src/app/(member)/home/page.tsx` compares against UTC "today" while the write actions store the member's local date from a client-provided `tzOffsetMinutes`. This write-local / read-UTC asymmetry is a known imprecision near midnight in UTC-offset zones — documented in DECISION-023 and acceptable for a template.

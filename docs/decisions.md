@@ -4,6 +4,28 @@ Architectural and implementation decisions for the Claude Code Starter. Newest f
 
 ---
 
+## DECISION-029: Periodic reviews consolidated into two recurring slots; work-log template is the single handoff format
+
+**Status:** Resolved
+**Date:** 2026-07-11
+**Feature:** `2026-07-11-instruction-layer-slim`
+
+### Decision
+
+**1. Review slots.** The eight independent review cadences are consolidated into two recurring slots: a **release slot** (14 days, or at each release if sooner: `test-coverage` + `retrospective`) and a **monthly health-check** (30 days, one bundled session: `code`, `documentation`, `security`, `agent-instruction`, `dependencies`). Fork-only syncs (`upstream-sync` 14 d, `downstream-sync` 30 d) are unchanged. Each review type keeps its own line in `docs/reviews/log.md`, preserving per-type history.
+
+**Why:** eight weeks of log history showed the 7-day reviews ran once (2026-05-17) and the 30-day reviews were executed in batch sessions anyway (all on 05-17, again on 07-01). The independent cadences produced overdue-review noise at session start without producing more frequent reviews. Two slots match observed practice; the session-start cadence check now has two dates to evaluate instead of eight.
+
+**2. Handoff format.** `docs/work-log/_template.md` is the single canonical per-phase handoff format. The generic "standard handoff template" previously duplicated in all nine agent files (and conflicting with the template's structured sections) is removed; agent files point at the template instead.
+
+### Consequences
+
+- `test-coverage` and `retrospective` cadence moves 7 d → 14 d (or per-release, whichever is sooner).
+- CLAUDE.md → Periodic Reviews, `docs/reviews/log.md` header, and the qa / tech-lead agent files reflect the slots.
+- If reviews start slipping under the bundled model (e.g., health-checks routinely >45 days), revisit — the slots are a floor, not a ceiling.
+
+---
+
 ## DECISION-028: `api/webhooks/` subtree is the sanctioned location for inbound webhook handlers; disabled-when-unset returns 200 not 5xx
 
 **Status:** Resolved

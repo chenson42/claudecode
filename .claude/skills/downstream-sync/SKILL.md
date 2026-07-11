@@ -38,19 +38,13 @@ This is the deliberate pass. (It is itself a backport candidate: a starter that 
 
 ## Known Untested Paths (read this first)
 
-This skill was ported from a derived fork (huddleup.health) where it was proven against a real
-derived project. The port strips monorepo-specific path-mapping and product-specific seed values.
-The following paths have NOT been exercised against a real fork ↔ canonical-starter pair from the
-starter's own codebase:
-
-- The `gh api repos/.../contents/.claude/skills` diffing calls against the canonical repo.
-- The classification heuristic on real fork-vs-starter divergences.
-- The punch-list and contribution-kit rendering against real data.
-- The state-file update on a non-empty run from a flat-layout fork.
-
-**If you are the first fork-owner running this skill: you are the first real test.** If something
-fails or produces obviously wrong output, open an issue at
-`github.com/chenson42/claudecode-nextjs-starter` so future forks benefit from the fix.
+Ported from a derived fork (huddleup.health) where it was proven against a real project; the port
+strips monorepo path-mapping and product-specific seed values. Not yet exercised against a real
+fork ↔ canonical pair from this codebase: the `gh api .../contents/.claude/skills` diffing calls,
+the classification heuristic on real divergences, the punch-list/contribution-kit rendering, and
+the state-file update from a flat-layout fork. **If you are the first fork-owner running this
+skill, you are the first real test** — if something fails, open an issue at
+`github.com/chenson42/claudecode-nextjs-starter`.
 
 ---
 

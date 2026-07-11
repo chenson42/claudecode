@@ -190,9 +190,19 @@ Failures: [...]
 - `src/lib/two-factor.ts`: X%
 - `src/lib/flags.ts`: X%
 
+## Feature-Gate Audit
+
+*(Mandatory — see qa agent. Verified by reading route/action bodies, not by inferring from green tests. Write "no protected routes touched" if none.)*
+
+| Route or action | `auth()` present? | `hasFeature(...)` present? | Correct `FEATURES.*` key? |
+|-----------------|-------------------|----------------------------|----------------------------|
+| [method + path, or action name] | yes / no | yes / no | `FEATURES.X` or n/a |
+
 ## Verdict
 
-[PASS | FAIL]
+[PASS | FAIL | BLOCKED — name the unmet prerequisite]
+
+*(Auth-touching diffs: PASS requires e2e against a real dev server with an MFA-enrolled seeded user; deferred e2e = BLOCKED.)*
 
 ---
 
