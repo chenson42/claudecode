@@ -10,7 +10,7 @@ Fork it, search-and-replace the project name, tune the brand colors in the `@the
 
 ## Capability Map
 
-The full feature catalog (with per-feature detail) lives in `README.md` → "What you get out of the box." The operational summary:
+The full feature catalog (with per-feature detail) lives in `README.md` → "What you get out of the box." The file-level jump-off map is `docs/product/functionality-map.md` — its short index is auto-printed at session start (`scripts/functionality-map.mjs` SessionStart hook), and **the full map is a required read before proposing, scoping, or designing any feature** so you never rebuild or conflict with something already shipped. Keeping it current is Workflow Rule 14. The operational summary:
 
 - **Auth & accounts** — NextAuth 5 beta (Google OAuth + credentials; JWT sessions carry roles, features, 2FA state) · TOTP 2FA with QR enrolment, recovery codes, trusted-device cookie · self-serve `/account` (profile, email change + re-verification, password change, per-user 2FA at `/account/2fa`, delete skeleton) · forgot/reset-password flow · account lockout (5 failed passwords → 15-min lock; enumeration-safe, OAuth-exempt; admins clear locks on `/admin/users`) · Turnstile CAPTCHA on sign-in + forgot-password (no-op until keyed) · auth-mode flags `auth.local_login` and `auth.require_2fa` (both fail-open, toggled at `/admin/flags`).
 - **Authorization** — roles ↔ features ↔ users permissions (`src/lib/permissions.ts`) and environment feature flags (`src/lib/flags.ts`). Two distinct concepts — see Key Invariants → Permissions vs Flags.
@@ -85,9 +85,11 @@ src/
 └── types/                   — Ambient type declarations
 scripts/
 ├── seed.ts                  — Roles + features + demo flag seed
-└── feedback-check.mjs       — SessionStart hook: counts status='new' rows; count only
+├── feedback-check.mjs       — SessionStart hook: counts status='new' rows; count only
+└── functionality-map.mjs    — SessionStart hook: prints the functionality map's short index
 docs/
 ├── TODO.md                  — Backlog & follow-up ledger (reconcile in the same commit as the work)
+├── product/functionality-map.md — Living what-exists map (Rule 14; required read before scope work)
 ├── ui-standards.md          — UI conventions + pre-merge UX audit checklist (Phase 5 reference)
 ├── decisions.md             — ADR-style decision log
 ├── work-log/                — Per-feature pipeline tracking (_template.md is the canonical format)
@@ -264,6 +266,7 @@ Slugs are short, lowercase, hyphenated, and stable. Don't rename them after the 
 11. **Never amend or force-push to diagnose an external-system failure.** When the same commit suddenly yields a different deploy or CI result, the external system changed — not your code. Get ground truth from the failing service's dashboard before touching git history.
 12. **Mark feedback rows at delivery.** When Phase 6 closes a feature that originated from in-app member feedback, update the `feedback` row from `triaged` to `done` (the work-log's Source block records the row UUID). Not before Phase 6 — the row stays `triaged` while in flight.
 13. **What's-new advisory at SHIP IT.** At Phase 6, if the shipped feature introduces member-visible behavior, consider publishing a `whats_new_entries` entry (admin CRUD at `/admin/whats-new`). Not required for internal admin tooling, infrastructure, or bug fixes.
+14. **Keep the functionality map current.** When a feature is added, materially changed, or removed, update its line in `docs/product/functionality-map.md` — both the short Index (if a whole surface/area shifts) and the full-map bullet — **at ship time**, in the same housekeeping cluster as the release-notes entry and the TODO reconciliation (Rule 10); the `/release-notes` skill is the natural place. The map's index is loaded into every session by the SessionStart hook, so a stale map actively misleads. The documentation review is the backstop, not the place to defer a change you just shipped.
 
 ## Commit Message Standards
 

@@ -85,6 +85,7 @@ Add to the current minor-version file, newest first.
 Review `CLAUDE.md` for drift introduced by the release:
 
 - **Capability Map** (and README's "What you get out of the box") — if the release adds any user-visible capability (a new page, a new auth flow, a new library, a new pattern like `ActionResult<T>`), add it to the relevant Capability Map bullet in CLAUDE.md and the detailed catalog in README. Keep the existing tone: concise, no internal implementation detail unless it's a concept a fork will copy.
+- **Functionality map (Workflow Rule 14)** — update `docs/product/functionality-map.md` for every feature the release adds, materially changes, or removes: the full-map bullet (one line, primary file as jump-off) and the short Index if a whole surface/area shifted. Bump the map's version/surveyed stamp to match the release.
 - **"Project Layout"** — if the release adds any route group or top-level directory under `src/app/`, add the corresponding line to the tree in the right alphabetical/logical position.
 - **"Common Commands"** — if the release adds any npm script that a developer or agent would need to invoke, add it to the command block.
 

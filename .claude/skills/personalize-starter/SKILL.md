@@ -103,6 +103,7 @@ Apply find-replace and structured edits across:
 - `src/app/(auth)/signin/page.tsx` — any heading copy that mentions the starter
 - `CLAUDE.md` — `## Project Overview` and `## Capability Map` sections (rewrite to describe the new project, not the starter). Keep the workflow sections (`Agent Roster`, `Development Pipeline`, `Periodic Reviews`, etc.) — those are the SDLC pattern the forker wanted.
 - `README.md` — full rewrite using the new identity. Keep the structure (Good for / Not for / What you get / The SDLC bit / Quick start / Common commands / Env vars / Forking notes / License). Update every cross-reference.
+- `docs/product/functionality-map.md` — do NOT rewrite; keep it as-is (it maps the starter features the fork inherits) and update its header line to the new project name. It evolves per Workflow Rule 14 as the fork builds.
 - `deck/slides.md` frontmatter — `header`, `footer`, cover slide title (if keeping the deck)
 - `.env.example` — `RESEND_FROM_EMAIL` placeholder
 
