@@ -19,7 +19,19 @@ detail lives in the linked doc, not here.
 
 ## Next Up
 
+- [ ] Security/code punch batch (small, one pipeline): add `hasFeature(ADMIN_DASHBOARD)` to all four exports in `(admin)/admin/2fa/actions.ts` (M5) · `escapeHtml()` on `newEmail` in `changeEmail` email body (L2) · `checkRateLimit` on `changePassword` (L1, open since 05-17) · UUID-validate `userId`/`roleId` in assign/removeRoleAction (L3) · `crypto.timingSafeEqual` for `CRON_SECRET` in both cron routes (L4) · delete dead `prepareEnrollment` + orphaned `PENDING_TTL_MINUTES` in `(account)/account/2fa/actions.ts` — sources: `docs/reviews/2026-07-11-security.md`, `2026-07-11-code.md`
+- [ ] Unit test for `loadEnv()` in `scripts/feedback-check.mjs` — QA recommended it during the feedback-dev-loop loop-back but it was never filed — retro 2026-07-11 #5
+- [ ] Bump `eslint` → 10.x + `eslint-config-next` → 16.2.10+ together (now unblocked); branch-test TypeScript 6.0 (not 7.x — typescript-eslint) — `docs/reviews/2026-07-11-dependencies.md`
+
 ## Backlog
+
+- [ ] Extract duplicated recovery-codes helpers (`(admin)/admin/2fa/actions.ts` ↔ `(account)/account/2fa/actions.ts`) into `src/lib/` — carried since 05-17; longer-term, consider consolidating the two 2FA surfaces into one implementation (product decision) — code + security 2026-07-11
+- [ ] Batch-bump routine low-risk deps (Radix, Tailwind patch, React types, Resend, otplib, lucide, tsx, Playwright, Vitest) in one PR — deps 2026-07-11
+- [ ] Watch for `drizzle-kit@1.0.0` stable (resolves esbuild GHSA-67mh-4wv8-2f99; treat as major-version project with Neon branch smoke) and Next `16.3.x` stable (bundles postcss 8.5.10, resolves GHSA-qx2v-qp2m-jg93) — deps 2026-07-11
+- [ ] Consider a `db.transaction(`-with-neon-http grep tripwire (mirror of check:sql-date) — the BUG-1 class; retro 2026-07-11 #2
+- [ ] Schema comment on `emailQueue` pointing at `RawQueueRow`/`fromRaw()` in `src/lib/email/queue.ts` so future columns don't silently skip the atomic-claim path — code 2026-07-11
+- [ ] ADR for the "text, not pgEnum" status-column convention (or add DB CHECK constraints) — security 2026-07-11 (observational)
+- [ ] Next release slot: run a standalone test-coverage sweep (don't rely on incidental Phase 5 numbers) — retro 2026-07-11 #6
 
 - [ ] Reconcile `.env.example` as the canonical env-var inventory — `DATABASE_URL_UNPOOLED`, `AUTH_TRUST_HOST`, `UPSTASH_REDIS_REST_URL/TOKEN`, `TRUST_PROXY_HEADERS`, `RATE_LIMIT_DISABLED` referenced elsewhere but absent from it; verify each against actual `process.env` usage — follow-up from `docs/reviews/2026-07-11-agent-instruction.md`
 - [ ] Deck: check whether the review-cadence slide needs updating for the two-slot consolidation (DECISION-029) at the next `deck/slides.md` edit

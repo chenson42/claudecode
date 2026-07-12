@@ -278,7 +278,7 @@ Allowed prefixes: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `style`, `
     Caught-By: automated-test | agent-review | human-review | production
     Discovered-In: Phase-1 | Phase-2 | Phase-3 | Phase-4 | Phase-5 | Phase-6 | post-merge | production
 
-`Caught-By` rule: if CI would have caught the bug without any agent judgment, use `automated-test`; if an agent had to decide to run a non-mandatory check, use `agent-review`.
+`Caught-By` rule: if CI would have caught the bug without any agent judgment, use `automated-test`; if an agent had to decide to run a non-mandatory check, use `agent-review`. Bugs discovered by cross-repo review (sibling harvest, upstream/downstream sync) are `agent-review` — name the harvest in the commit body so the cross-repo provenance isn't lost.
 
 **Mixed-commit rule.** One commit, one prefix. A commit that adds a feature and fixes a bug must be split — there is no compound prefix.
 

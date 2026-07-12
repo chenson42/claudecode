@@ -18,7 +18,7 @@
 | 3 — Technical design | tech-lead | Skipped — findings doc is the design | — | 2026-07-11 |
 | 4 — Implementation | main session | Complete | — | 2026-07-11 |
 | 5 — Verification | main session (inline) | Complete | PASS (doc-only) | 2026-07-11 |
-| 6 — Shipped vs intent | user | Pending diff review | — | — |
+| 6 — Shipped vs intent | user | Complete | SHIP IT | 2026-07-11 |
 
 ---
 
@@ -71,4 +71,4 @@ Doc-only change: no typecheck/build/tests apply. Verification performed by rule-
 
 # Phase 6 — Shipped vs Intent
 
-Pending the user's review of the diff before commit (Workflow Rule 1). The intent ("rewrite the instruction layer to be more efficient without losing rules") is auditable via `git diff`.
+**SHIP IT** — the user reviewed the findings and diff and approved commit + push (`ecc5d2d`, pushed to main 2026-07-11 after a green `/pre-push`). Shipped matches intent: instruction layer slimmed ~40% with all 13 Workflow Rules, all 6 phase gates, and every invariant preserved; drift fixed; review cadences consolidated per DECISION-029. Follow-ups (`.env.example` reconciliation, deck cadence-slide check) were filed in `docs/TODO.md` in the same commit. Not member-visible — no what's-new entry (Rule 13 n/a).

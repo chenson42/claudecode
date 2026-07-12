@@ -27,6 +27,10 @@ For no-op reviews (a cycle genuinely produced no actionable findings): `nothing 
 ## Entries
 
 <!-- newest entries go here, above the older ones -->
+2026-07-11 | retrospective | Pipeline healthy: all 6 edits from 05-17 landed; 1 formal loop-back across 25 pipelines (caught real hook defect); 0 trailer bypasses; risk: 57% of fixes found post-merge, 100% agent-review — e2e gate is sole defense for runtime/framework bug class; 8 punch items; see 2026-07-11-retrospective.md
+2026-07-11 | security | 0 critical/high, 1 medium (new: admin/2fa actions lack independent hasFeature check, mitigated by proxy edge gate), 4 low, 3 informational; 6 of 10 prior findings fixed and verified; see 2026-07-11-security.md
+2026-07-11 | code | 0 critical, 3 notable, 3 minor, 7 observations; 6/10 prior findings fixed, 2 still open (changePassword rate limit, recovery-code helper dup); new: dead prepareEnrollment reintroduces fixed 2FA bug if wired up; see 2026-07-11-code.md
+2026-07-11 | dependencies | 7 moderate findings unchanged (esbuild/drizzle-kit dev-only, postcss/next transitive), both with RC/canary fixes pending stable cuts; eslint 10 now unblocked; TS target revised to 6.0; next-auth beta.31 unchanged 3mo; see 2026-07-11-dependencies.md
 2026-07-11 | agent-instruction | Instruction-layer slim: 9 agent descriptions de-exampled, handoff template single-sourced to work-log _template, stale refs fixed (architect tree, qa /home landing, analyst /totp, recordAudit pattern); see 2026-07-11-agent-instruction.md
 2026-07-11 | documentation | CLAUDE.md 451→~330 lines: feature catalog → README pointer + capability map, permissions-vs-flags single-sourced to Key Invariants, review cadences consolidated to two slots (DECISION-029); see 2026-07-11-agent-instruction.md
 2026-07-01 | test-coverage | Phase 5 sweep (4 pipelines): 259/259 unit tests green; 24/24 e2e green; critical modules (permissions, two-factor, flags, audit, request-ip, errors) all 100% stmts; email/queue.ts 68.75% stmts (untested runtime paths acceptable); overall 62.29% stmts on covered files

@@ -41,7 +41,7 @@ export const apiKeys = pgTable(
 ## Migrations: `db:push` vs `db:generate`
 
 - **`npm run db:push`** — sync the live DB to `schema.ts`. Fast, lossy. For early iteration on a Neon branch where dropping a column is fine.
-- **`npm run db:generate`** — versioned SQL migration in `drizzle/`. Reviewable, replayable. **Default for anything that ships.**
+- **`npm run db:generate`** — versioned SQL migration in `drizzle/`. Reviewable, replayable. **Default for anything that ships.** Immediately before generating, check `drizzle/` for the latest migration number and `docs/TODO.md` In Flight for concurrent schema pipelines — sequence explicitly to avoid numbering collisions (two schema pipelines collided-but-for-a-handwritten-note in the v0.6 wave).
 
 Either way, `schema.ts` is the source of truth — anything in the live DB not in `schema.ts` is dropped on the next push. If you hand-author SQL (rare), every statement must be idempotent (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `INSERT ... WHERE NOT EXISTS`, `pg_indexes` guard before `CREATE INDEX`).
 
