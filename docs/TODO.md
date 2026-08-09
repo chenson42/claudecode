@@ -33,6 +33,7 @@ detail lives in the linked doc, not here.
 - [ ] ADR for the "text, not pgEnum" status-column convention (or add DB CHECK constraints) — security 2026-07-11 (observational)
 - [ ] Next release slot: run a standalone test-coverage sweep (don't rely on incidental Phase 5 numbers) — retro 2026-07-11 #6
 - [ ] Harvest candidate: huddleup's `scripts/cadence-check.mjs` — SessionStart hook that computes overdue reviews and prints only the delta, replacing the manual read-log-and-compute ritual at session start — spotted during the 2026-07-12 functionality-map harvest
+- [ ] Remaining OPEN items from the starter-contribution triage (C3/C4 QA gates, C7/C8 process docs, A7/A8 deploy ordering, D2/D3 CI+cron, E2 `dialog.tsx` + E3/E4 primitives, F2 usage heartbeat, …) — work via `docs/reviews/2026-07-01-starter-contribution-triage.md`; specs in `docs/starter-contributions/README.md`
 
 - [ ] Reconcile `.env.example` as the canonical env-var inventory — `DATABASE_URL_UNPOOLED`, `AUTH_TRUST_HOST`, `UPSTASH_REDIS_REST_URL/TOKEN`, `TRUST_PROXY_HEADERS`, `RATE_LIMIT_DISABLED` referenced elsewhere but absent from it; verify each against actual `process.env` usage — follow-up from `docs/reviews/2026-07-11-agent-instruction.md`
 - [ ] Deck: check whether the review-cadence slide needs updating for the two-slot consolidation (DECISION-029) at the next `deck/slides.md` edit
@@ -45,6 +46,7 @@ detail lives in the linked doc, not here.
 
 ## Done
 
+- [x] 2026-07-13 — PR #3 closed as superseded (its skill copy was the pre-generalization fork variant; main's port from 20fb316 stands); contribution kit landed as `docs/starter-contributions/README.md` with a live-status banner (stale "dormant" caveat + top-down PR order removed); fork-sync skills + kit added to the functionality map
 - [x] 2026-07-12 — Functionality map harvested from huddleup.health: `docs/product/functionality-map.md` + SessionStart index hook + Workflow Rule 14 + release-notes/personalize-starter wiring — `docs/work-log/2026-07-12-functionality-map.md`
 - [x] 2026-07-11 — Instruction-layer slim: CLAUDE.md 451→~330 lines, 9 agents de-duplicated + de-drifted, handoff format single-sourced to work-log template, review cadences consolidated to two slots (DECISION-029) — `docs/work-log/2026-07-11-instruction-layer-slim.md`
 - [x] 2026-07-02 — v0.6.0 shipped: PR #4 merged to main (30 commits — member home, feedback dev-loop, admin ops suite, email reliability, security batch, 6 fixes, tooling); branch deleted via /merge-pr
