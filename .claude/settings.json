@@ -35,6 +35,21 @@
           {
             "type": "command",
             "command": "node scripts/functionality-map.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/cadence-check.mjs"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/pre-push-gate.mjs"
           }
         ]
       }

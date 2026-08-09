@@ -19,7 +19,7 @@ map describes the features you inherited; extend it as you build on top.
 - **Platform lib** — permissions (`FEATURES` + `hasFeature`), flags (`isFlagEnabled`, cached), `recordAudit()`, TOTP crypto + pending enrolment, rate limiting, request-ip, Turnstile, email queue (persist-first + retry + Resend webhook) with `escapeHtml`.
 - **API / Cron** — NextAuth routes, Resend delivery webhook, `CRON_SECRET`-gated email-queue worker + daily maintenance (token GC).
 - **Flags** — `demo.new_dashboard`, `auth.local_login` (OAuth-only switch), `auth.require_2fa` (org 2FA switch) — both auth flags fail-open.
-- **Dev-loop tooling** — SessionStart hooks (feedback count, functionality-map index), commit-msg hook + escape-rate stats, `check:audit` + `check:sql-date` tripwires, seed script, Marp deck, 11 e2e suites, fork-sync skills (`/upstream-sync` + `/downstream-sync`) + contribution-kit specs.
+- **Dev-loop tooling** — SessionStart hooks (feedback count, functionality-map index, cadence check), pre-push PreToolUse gate, commit-msg hook (+ `Work-Log:` trailer) + escape-rate stats, `check:audit` + `check:sql-date` tripwires, CI (typecheck/build/tests/commit-grammar + secret-gated Neon-branch e2e + opt-in Claude PR review + dependabot), seed script, Marp deck, 11 e2e suites, fork-sync skills (`/upstream-sync` + `/downstream-sync`) + contribution-kit specs, `AGENTS.md` shim.
 
 ---
 
@@ -91,9 +91,12 @@ map describes the features you inherited; extend it as you build on top.
 
 ## Dev-loop tooling
 
-- SessionStart hooks — feedback count (count only, never body content) + functionality-map short index. `scripts/feedback-check.mjs`, `scripts/functionality-map.mjs`
-- Commit standards — prefix + `fix:` trailers enforced by git hook; 30-day escape-rate report. `scripts/commit-msg.mjs`, `stats-escape.mjs`, `install-hooks.sh`
+- SessionStart hooks — feedback count (count only, never body content) + functionality-map short index + overdue-review cadence check. `scripts/feedback-check.mjs`, `scripts/functionality-map.mjs`, `scripts/cadence-check.mjs`
+- Pre-push gate — PreToolUse hook blocks in-session `git push` unless `/pre-push` stamped a HEAD-keyed marker (Rule 5 mechanized). `scripts/pre-push-gate.mjs`
+- Commit standards — prefix + `fix:` trailers + `Work-Log:` trailer on feat/fix, enforced by git hook locally and re-validated on PRs in CI; 30-day escape-rate report. `scripts/commit-msg.mjs`, `validate-commit-range.mjs`, `stats-escape.mjs`, `install-hooks.sh`
 - Tripwires — audit coverage of mutations, `sql<Date>` ban. `scripts/check-audit-coverage.mjs`, `check-sql-date.mjs`
+- CI — typecheck/lint/build/tripwires/`npm audit`/unit tests + commit-grammar job on PRs; e2e on an ephemeral Neon branch (secret-gated); opt-in Claude PR review (secret-gated); dependabot grouped updates. `.github/workflows/ci.yml`, `e2e.yml`, `claude-review.yml`, `.github/dependabot.yml`
+- Cross-tool shim — `AGENTS.md` points non-Claude agents (Cursor/Codex/Jules) at CLAUDE.md and the must-honor rules. `AGENTS.md`
 - Seed — roles, `FEATURE_CATALOG`, demo + auth flags, seed users (admin / member / MFA-admin). `scripts/seed.ts`
 - Training deck — Marp source → committed PDF. `deck/slides.md`
 - E2E — 11 Playwright suites (auth, admin, member, security headers, TZ dates) with cached storageState + DB isolation guard. `e2e/`

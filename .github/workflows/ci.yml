@@ -36,8 +36,30 @@ jobs:
           AUTH_URL: "http://localhost:3000"
           AUTH_TOTP_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
-      - name: Audit-log invariant check
-        run: npm run check:audit
+      - name: Tripwire checks (audit-log invariant + sql-date)
+        run: npm run check
+
+      - name: Dependency audit (production deps, high+)
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Unit tests
         run: npm test
+
+  # The commit-msg hook only runs where `npm install` has installed it — GitHub
+  # web edits and fresh clones bypass it silently. This job re-validates every
+  # PR commit with the same exported validator the hook uses.
+  commit-grammar:
+    name: commit grammar
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: Validate commit messages
+        run: node scripts/validate-commit-range.mjs "origin/${{ github.base_ref }}..HEAD"

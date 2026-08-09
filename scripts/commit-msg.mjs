@@ -36,6 +36,12 @@ const ALLOWED_DISCOVERED_IN = [
   "production",
 ];
 
+// Work-log slug: YYYY-MM-DD-<short-kebab-slug>, matching docs/work-log/ filenames.
+// Joins a commit to its pipeline (Fable external review 2026-08-09, B1) so
+// escape-rate tooling can map commits → work-logs mechanically instead of the
+// retrospective hand-reconstructing it.
+const WORK_LOG_RE = /^\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*$/;
+
 // ── Trailer parser ───────────────────────────────────────────────────────────
 
 /**
@@ -107,15 +113,41 @@ export function validateCommitMessage(message) {
     };
   }
 
-  // Step 5 — fix: trailer requirements
-  const prefixMatch = /^(fix)(\([^)]+\))?:/.exec(subject);
-  if (!prefixMatch) {
-    return { ok: true };
-  }
+  // Step 5 — trailer requirements by prefix
+  const prefix = /^(feat|fix|chore|docs|test|refactor|style|perf|build|ci)/.exec(
+    subject,
+  )?.[1];
 
   // Rebuild full message with comment lines stripped for trailer parsing
   const strippedMessage = lines.join("\n");
   const trailers = parseTrailers(strippedMessage);
+
+  // Work-Log trailer: required for feat/fix (Feature and bug-fix classes always
+  // have a work-log per Workflow Rule 8); format-validated whenever present.
+  if (trailers.has("Work-Log")) {
+    const workLog = trailers.get("Work-Log");
+    if (!WORK_LOG_RE.test(workLog)) {
+      return {
+        ok: false,
+        error:
+          `Error: Work-Log value "${workLog}" is not a valid work-log slug.\n` +
+          `Expected: YYYY-MM-DD-<short-kebab-slug> (a docs/work-log/ filename without .md)\n` +
+          `Example: Work-Log: 2026-08-09-enforcement-batch`,
+      };
+    }
+  } else if (prefix === "feat" || prefix === "fix") {
+    return {
+      ok: false,
+      error:
+        `Error: ${prefix} commits require a "Work-Log: YYYY-MM-DD-<slug>" trailer\n` +
+        `naming the pipeline's work-log file (Workflow Rule 8 — feat/fix work always has one).\n` +
+        `Example: Work-Log: 2026-08-09-enforcement-batch`,
+    };
+  }
+
+  if (prefix !== "fix") {
+    return { ok: true };
+  }
 
   // Step 6 — Caught-By presence
   if (!trailers.has("Caught-By")) {

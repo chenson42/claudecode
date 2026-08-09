@@ -16,15 +16,29 @@ detail lives in the linked doc, not here.
 
 ## In Flight
 
-
 ## Next Up
 
+- [ ] Configure `NEON_API_KEY` + `NEON_PROJECT_ID` repo secrets to activate e2e CI (optional: `ANTHROPIC_API_KEY` for Claude PR review); watch the first live run of both workflows (pinned Neon action versions unverified until then) — enforcement batch residual
+
+- [ ] Fable review D1: `src/instrumentation.ts` + Sentry (free-tier) stub + thin `src/lib/log.ts` wrapper, in teaching-comment style — `docs/reviews/2026-08-09-fable-external-review.md`
+- [ ] Fable review D2: migrate legacy `assignRoleAction`/`removeRoleAction` to `ActionResult` + feature gate + validated IDs; bless zod (or small parse helper) as the validation pattern
+- [ ] Fable review D3: README deployment section (Vercel setup, cron registration, `db:migrate` vs `db:push` on deploy) + add `CRON_SECRET`/Turnstile/seed vars to the README env table
+- [ ] Fable review B2: acceptance-criteria section (EARS-style) in `docs/work-log/_template.md` Phase 1, checked off row-by-row in Phase 5, verified in Phase 6
+- [ ] Fable review B3: SessionStart hook printing `slug | phase | status` for open work-logs (machine-readable pipeline state; would have caught the two stale-Pending Phase 6 rows)
+- [ ] Fable review E1–E4 process batch: `/test` bank opt-in for release-class merges + soften pre-push HARD STOP to confirm · Phase 6 skippable-with-notation for Polish class · demote CLAUDE.md capability map to pointer + pre-push map-version-vs-package.json check · legitimize "process-harvest mode" in the Classification table
+- [ ] Fable review E5: `tools:` frontmatter restrictions for analyst + qa agents; document (or vary) the all-sonnet model choice; widen full-stack-developer charter or push the split
+- [ ] Fable review D4: reconcile `components/ui/` vs CLAUDE.md "shadcn primitives" claim + Rule 2's nonexistent `Dialog` — ship the implied primitives or correct the docs
 - [ ] Security/code punch batch (small, one pipeline): add `hasFeature(ADMIN_DASHBOARD)` to all four exports in `(admin)/admin/2fa/actions.ts` (M5) · `escapeHtml()` on `newEmail` in `changeEmail` email body (L2) · `checkRateLimit` on `changePassword` (L1, open since 05-17) · UUID-validate `userId`/`roleId` in assign/removeRoleAction (L3) · `crypto.timingSafeEqual` for `CRON_SECRET` in both cron routes (L4) · delete dead `prepareEnrollment` + orphaned `PENDING_TTL_MINUTES` in `(account)/account/2fa/actions.ts` — sources: `docs/reviews/2026-07-11-security.md`, `2026-07-11-code.md`
 - [ ] Unit test for `loadEnv()` in `scripts/feedback-check.mjs` — QA recommended it during the feedback-dev-loop loop-back but it was never filed — retro 2026-07-11 #5
 - [ ] Bump `eslint` → 10.x + `eslint-config-next` → 16.2.10+ together (now unblocked); branch-test TypeScript 6.0 (not 7.x — typescript-eslint) — `docs/reviews/2026-07-11-dependencies.md`
 
 ## Backlog
 
+- [ ] Fable review C2: package the `.claude/` process layer as a Claude Code plugin (versioned `plugin.json`, marketplace-installable) — candidate successor to fork-and-copy + `upstream-sync` diffing
+- [ ] Fable review C3: move auth/server-action rules into path-scoped `.claude/rules/*.md` to relieve CLAUDE.md load
+- [ ] Fable review C5: test-tampering ratchet (commit failing tests before implementation, tests frozen during Phase 4) + evaluate mutation testing as a future `check:*` tripwire
+- [ ] Fable review D5 nits: `fileURLToPath` in `functionality-map.mjs`/`check-audit-coverage.mjs` (Windows) · parameterize `stats-escape.mjs` `--since` (30d window vs 14d retro cadence double-counts)
+- [ ] Fable review F8: escape-rate alarm sentence in tech-lead.md (post-merge % rising two retros running → propose a named tripwire) · state branch-protection/PR-required posture for `main` in CLAUDE.md · one-line-per-decision index atop `docs/decisions.md` · add deployment-engineer's "Pre-Deploy" section stub to `_template.md`
 - [ ] Extract duplicated recovery-codes helpers (`(admin)/admin/2fa/actions.ts` ↔ `(account)/account/2fa/actions.ts`) into `src/lib/` — carried since 05-17; longer-term, consider consolidating the two 2FA surfaces into one implementation (product decision) — code + security 2026-07-11
 - [ ] Batch-bump routine low-risk deps (Radix, Tailwind patch, React types, Resend, otplib, lucide, tsx, Playwright, Vitest) in one PR — deps 2026-07-11
 - [ ] Watch for `drizzle-kit@1.0.0` stable (resolves esbuild GHSA-67mh-4wv8-2f99; treat as major-version project with Neon branch smoke) and Next `16.3.x` stable (bundles postcss 8.5.10, resolves GHSA-qx2v-qp2m-jg93) — deps 2026-07-11
@@ -46,6 +60,7 @@ detail lives in the linked doc, not here.
 
 ## Done
 
+- [x] 2026-08-09 — Enforcement batch from the Fable external review: CI runs both tripwires + `npm audit` + commit-grammar job; dependabot; e2e-in-CI on ephemeral Neon branch + playwright `webServer`; cadence-check SessionStart hook; pre-push PreToolUse gate (Rule 5 mechanized); `Work-Log:` commit trailer (required on feat/fix); `AGENTS.md` shim; opt-in Claude PR review — `docs/work-log/2026-08-09-enforcement-batch.md`
 - [x] 2026-07-13 — PR #3 closed as superseded (its skill copy was the pre-generalization fork variant; main's port from 20fb316 stands); contribution kit landed as `docs/starter-contributions/README.md` with a live-status banner (stale "dormant" caveat + top-down PR order removed); fork-sync skills + kit added to the functionality map
 - [x] 2026-07-12 — Functionality map harvested from huddleup.health: `docs/product/functionality-map.md` + SessionStart index hook + Workflow Rule 14 + release-notes/personalize-starter wiring — `docs/work-log/2026-07-12-functionality-map.md`
 - [x] 2026-07-11 — Instruction-layer slim: CLAUDE.md 451→~330 lines, 9 agents de-duplicated + de-drifted, handoff format single-sourced to work-log template, review cadences consolidated to two slots (DECISION-029) — `docs/work-log/2026-07-11-instruction-layer-slim.md`

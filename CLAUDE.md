@@ -283,6 +283,12 @@ Allowed prefixes: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `style`, `
 
 `Caught-By` rule: if CI would have caught the bug without any agent judgment, use `automated-test`; if an agent had to decide to run a non-mandatory check, use `agent-review`. Bugs discovered by cross-repo review (sibling harvest, upstream/downstream sync) are `agent-review` — name the harvest in the commit body so the cross-repo provenance isn't lost.
 
+**Work-Log trailer.** Every `feat:` and `fix:` commit must also carry a `Work-Log:` trailer naming its pipeline's work-log slug (the `docs/work-log/` filename without `.md`), and any commit may carry one:
+
+    Work-Log: YYYY-MM-DD-<slug>
+
+This joins commits to pipelines mechanically — the retrospective and `stats:escape`-style tooling can map commit → work-log without hand-reconstruction. Feature and bug-fix classes always have a work-log (Rule 8), so the trailer is never missing by design; batch work references the batch's slug. Enforced by the commit-msg hook locally and the commit-grammar CI job on PRs.
+
 **Mixed-commit rule.** One commit, one prefix. A commit that adds a feature and fixes a bug must be split — there is no compound prefix.
 
 **Hook bypass.** Never use `git commit --no-verify`. If the hook rejects a valid commit, fix the hook. The `npm run stats:escape` "Missing trailers (bypass)" count should be zero in every retrospective.

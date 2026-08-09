@@ -163,6 +163,10 @@ Treat these as advisory warnings, not hard blockers (unless the user decides oth
   ```bash
   git diff --name-only | grep -E "\.env"
   ```
+- **Deck re-rendered?** If `deck/slides.md` changed in this branch, `deck/slides.pdf` must change with it (CLAUDE.md → "Re-render the deck"):
+  ```bash
+  git diff main...HEAD --name-only | grep -q "deck/slides.md" && { git diff main...HEAD --name-only | grep -q "deck/slides.pdf" || echo "WARN: deck/slides.md changed but slides.pdf was not re-rendered — run npm run deck and commit the PDF"; }
+  ```
 
 ## Step 7b: Dependency CVE Audit
 
@@ -189,5 +193,13 @@ Report results:
 - Housekeeping warnings: list them
 - **Ready to push? yes / no**
 - If no: list each item that must be resolved first
+
+**If (and only if) the answer is yes**, stamp the pre-push marker so the push gate opens:
+
+```bash
+node scripts/pre-push-gate.mjs --stamp
+```
+
+A PreToolUse hook (`scripts/pre-push-gate.mjs`, registered in `.claude/settings.json`) blocks any in-session `git push` unless this marker exists and matches the current HEAD — committing anything after the stamp invalidates it, so re-run `/pre-push` after late commits (Workflow Rule 5, mechanized).
 
 **Do not push.** The user pushes manually.
