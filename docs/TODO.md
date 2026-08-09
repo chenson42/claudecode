@@ -18,6 +18,7 @@ detail lives in the linked doc, not here.
 
 ## Next Up
 
+- [ ] **URGENT — next-auth `5.0.0-beta.31` → `beta.32`** via a proper auth pipeline (full e2e gate, MFA user): clears 2 critical + 1 high Auth.js advisories in `@auth/core` (GHSA-xmf8-cvqr-rfgj uncaught exception on malformed Bearer header, GHSA-7rqj-j65f-68wh email-normalizer homoglyph bypass, GHSA-x445-f3h2-j279 OAuth state/nonce/PKCE cookies not provider-bound). Outside the pinned range, so `npm audit fix` can't take it. Then remove `continue-on-error` from the CI audit step — found during 2026-08-09 pre-push
 - [ ] Configure `NEON_API_KEY` + `NEON_PROJECT_ID` repo secrets to activate e2e CI (optional: `ANTHROPIC_API_KEY` for Claude PR review); watch the first live run of both workflows (pinned Neon action versions unverified until then) — enforcement batch residual
 
 - [ ] Fable review D1: `src/instrumentation.ts` + Sentry (free-tier) stub + thin `src/lib/log.ts` wrapper, in teaching-comment style — `docs/reviews/2026-08-09-fable-external-review.md`
@@ -41,7 +42,7 @@ detail lives in the linked doc, not here.
 - [ ] Fable review F8: escape-rate alarm sentence in tech-lead.md (post-merge % rising two retros running → propose a named tripwire) · state branch-protection/PR-required posture for `main` in CLAUDE.md · one-line-per-decision index atop `docs/decisions.md` · add deployment-engineer's "Pre-Deploy" section stub to `_template.md`
 - [ ] Extract duplicated recovery-codes helpers (`(admin)/admin/2fa/actions.ts` ↔ `(account)/account/2fa/actions.ts`) into `src/lib/` — carried since 05-17; longer-term, consider consolidating the two 2FA surfaces into one implementation (product decision) — code + security 2026-07-11
 - [ ] Batch-bump routine low-risk deps (Radix, Tailwind patch, React types, Resend, otplib, lucide, tsx, Playwright, Vitest) in one PR — deps 2026-07-11
-- [ ] Watch for `drizzle-kit@1.0.0` stable (resolves esbuild GHSA-67mh-4wv8-2f99; treat as major-version project with Neon branch smoke) and Next `16.3.x` stable (bundles postcss 8.5.10, resolves GHSA-qx2v-qp2m-jg93) — deps 2026-07-11
+- [ ] Watch for `drizzle-kit@1.0.0` stable (resolves esbuild GHSA-67mh-4wv8-2f99; treat as major-version project with Neon branch smoke) — deps 2026-07-11; Next 16.3.0 taken 2026-08-09 (resolved the bundled-postcss CVEs; 48/48 e2e)
 - [ ] Consider a `db.transaction(`-with-neon-http grep tripwire (mirror of check:sql-date) — the BUG-1 class; retro 2026-07-11 #2
 - [ ] Schema comment on `emailQueue` pointing at `RawQueueRow`/`fromRaw()` in `src/lib/email/queue.ts` so future columns don't silently skip the atomic-claim path — code 2026-07-11
 - [ ] ADR for the "text, not pgEnum" status-column convention (or add DB CHECK constraints) — security 2026-07-11 (observational)
