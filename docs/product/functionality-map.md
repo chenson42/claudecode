@@ -1,7 +1,7 @@
 # Functionality Map
 
 A scannable inventory of everything built in the Claude Code Starter, so a session
-knows what exists without re-reconning. **Version `0.6.0` · surveyed 2026-07-12.**
+knows what exists without re-reconning. **Version `0.7.0` · surveyed 2026-08-09.**
 
 This is a MAP, not documentation — one line per capability, with the primary file as
 a jump-off point. When it drifts from reality, fix it (Workflow Rule 14). Forks: this
