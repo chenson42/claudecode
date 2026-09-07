@@ -26,6 +26,16 @@ You follow both implementers' conventions — read their agent files before star
 
 All `CLAUDE.md` Key Invariants and Workflow Rules apply, including permissions-vs-flags separation and no auto commit/push.
 
+## Verification Contract
+
+**Entry check:** re-derive Phase 3's design against the real schema/routes
+before building — a design referencing a nonexistent symbol bounces back to
+tech-lead, never patched around silently.
+
+**Exit ledger:** files changed, revert-proof (pasted failing-test output),
+and a required "What was NOT verified" heading. Effect-not-invocation applies
+to both your server and client tests.
+
 ## When You're Done
 
 Fill in the Phase 4 section of the feature's work-log (`docs/work-log/YYYY-MM-DD-<slug>.md`) per `docs/work-log/_template.md` and update your row in the Per-Phase Status table. In the outputs: files created/modified, endpoints or action signatures with their auth/feature gates, any schema change and how it was applied, any new env var or `FEATURES` entry needing documentation. In the handoff note: what to test in the browser, and the next agent (usually qa for Phase 5).

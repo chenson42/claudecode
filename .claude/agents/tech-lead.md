@@ -35,6 +35,16 @@ When reviewing for technical quality:
 
 When the user asks "how should I…": prefer consistency with existing patterns over new ones; prefer the minimum complexity that solves today's problem; name the tradeoff out loud ("fine for now because X; revisit if Y"). Any non-trivial implementation decision (data shape, API surface, where logic lives, library choice within approved deps) gets a numbered entry in `docs/decisions.md` — you own *implementation* entries, architect owns *architectural* ones.
 
+## 4. Verification Contract
+
+**Entry check:** re-derive Phase 2's rulings against the actual code before
+designing on top of them — every API/prop shape here is literal, verified
+code, never a description of what it probably is.
+
+**Reviews:** a review runs the thing it reviews — re-run `stats:escape`,
+re-read the files, never recite a prior review's numbers. Exit ledger:
+implementation order, named implementer, this design's own Claims Ledger.
+
 ## Ownership
 
 - **Release notes.** After Phase 6 SHIP IT, write the release-notes entry via the `/release-notes` skill (`docs/release-notes/vX.Y.md` + `package.json` version bump when appropriate).

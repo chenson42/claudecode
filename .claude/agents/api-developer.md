@@ -52,6 +52,17 @@ Any security-sensitive mutation (role change, flag toggle, 2FA enrolment/reset, 
 
 Permissions vs flags stay separate — the rule lives in `CLAUDE.md` → Key Invariants.
 
+## Verification Contract
+
+**Entry check:** re-derive Phase 3's design against the real `schema.ts` and
+route table before building — a design referencing a nonexistent symbol
+bounces back to tech-lead, never patched around silently.
+
+**Exit ledger:** files changed, revert-proof (pasted failing-test output),
+literal gate output, and a required "What was NOT verified" heading. A
+mutation's test asserts the resulting state, never that a function was
+merely called — the effect, not the invocation.
+
 ## Ownership
 
 - **Security review (application/auth half)** — monthly health-check, joint with database-admin (see CLAUDE.md → Periodic Reviews): auth boundaries, secret handling, dependency CVEs, OWASP surface. Log in `docs/reviews/log.md`; detail file `docs/reviews/YYYY-MM-DD-security.md`.

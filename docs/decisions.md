@@ -4,6 +4,104 @@ Architectural and implementation decisions for the Claude Code Starter. Newest f
 
 ---
 
+## DECISION-033: `check:ledger`'s grandfather cutoff is `2026-09-07`, mirroring `stats:escape`'s precedent
+
+**Status:** Resolved
+**Date:** 2026-09-07
+**Feature:** `2026-09-07-verification-contracts`
+
+### Decision
+
+`scripts/check-ledger.mjs` (the `/pre-push`-blocking tripwire requiring a Claims Ledger table on any work-log phase marked `Complete`) only enforces against work-logs whose filename date (`docs/work-log/YYYY-MM-DD-<slug>.md`) is **strictly after `2026-09-07`**. Work-logs dated on or before the cutoff are grandfathered — the check never evaluates them, regardless of their Per-Phase Status table.
+
+### Rationale
+
+The Claims Ledger format did not exist before this feature (Increment 2) created it. At the moment `check:ledger` starts running in `/pre-push`, 46 pre-existing work-logs — most with phases 3+ marked `Complete` — have no ledger table and never will, short of a mass retrofit nobody asked for. Wiring the check as an unconditional hard block would make `/pre-push` permanently red the instant this feature merges. This repo already solved the identical problem once: `npm run stats:escape`'s hardcoded `2026-05-18` grandfather cutoff for the Work-Log trailer requirement (CLAUDE.md → Commit Message Standards). This decision reuses that exact pattern rather than inventing a new one — a scope test on the filename's own date prefix, no git plumbing needed.
+
+**Ruling chain:** architect (Phase 2, Notes item 4) ruled the check must be a hard `/pre-push` block (consistent with `/pre-push` already treating `check:audit`/`check:sql-date` as hard gates) with a grandfathered cutoff at Increment 2's ship date. tech-lead (Phase 3) specified the literal mechanism (`LEDGER_GRANDFATHER_CUTOFF` constant, filename-date scope test). full-stack-developer (Phase 4) set the literal value to `2026-09-07` (this feature's actual ship date) and confirmed 0-of-46 real work-logs are in scope at that cutoff.
+
+### Consequences
+
+- A future contributor extending `check-ledger.mjs`'s scope (e.g., lowering the bar, retiring the cutoff once no pre-cutoff work-logs remain relevant) should read this decision and `stats:escape`'s own cutoff-handling code before changing either constant.
+- If a future review finds work-logs routinely dodging the ledger requirement by predating a new cutoff, that's a signal to revisit — the cutoff is a bootstrap accommodation, not a permanent exemption class.
+
+---
+
+## DECISION-032: Local Trivial-exemption mechanism for the work-log gate is an operator-invoked, single-use `/trivial` marker — never self-issued by an agent
+
+**Status:** Resolved
+**Date:** 2026-09-07
+**Feature:** `2026-09-07-verification-contracts`
+
+### Decision
+
+`scripts/worklog-gate.mjs` (the `PreToolUse` hook on `Edit`/`Write` enforcing Workflow Rule 8 against `src/**`/`drizzle/**`) has exactly one local escape hatch: `.claude/trivial-ok.json`, a gitignored marker written **only** by the `.claude/skills/trivial/SKILL.md` skill (`/trivial <path> "<reason>"`). The marker is scoped to one literal path (never a glob), expires 10 minutes after stamping, and is deleted by the hook the moment it is consumed — it can never silently cover a second, unrelated edit or an entire session. The skill's own instructions state, and every agent file must honor: **an agent must never invoke `/trivial` on its own initiative to route around a block it just received.** If a block looks wrong, the agent explains why to the operator and waits; only the operator's own explicit invocation is a valid exemption.
+
+### Rationale
+
+The harvested `check-worklog.mjs` (from `~/git/npvitals`) has a Trivial escape hatch, but it is a maintainer-applied GitHub PR label, checked only in `--ci` mode — a mechanism this repo's CI does not have, and Phase 2's architectural review (Notes item 1) ruled that porting the harvest's hook mode as-is would leave every Trivial-class edit to `src/**`/`drizzle/**` **permanently blocked with zero escape hatch**, directly contradicting CLAUDE.md's own Classification table ("Trivial: No work-log, no pipeline"). A local mechanism was required, but a self-service one — an agent stamping its own exemption mid-task — would reintroduce exactly the self-attestation risk the GitHub-label design avoided (no one grades their own work). The `/trivial` skill's operator-only, single-use, short-expiry marker is the closest local analog to a maintainer-applied label: narrow, auditable, and never issuable by the same agent making the edit.
+
+**Ruling chain:** architect (Phase 2, Notes item 1) identified the gap and set the constraint ("must not be a self-service flag the editing agent sets in the same turn"). tech-lead (Phase 3) designed the literal marker shape, expiry, and skill. full-stack-developer (Phase 4) implemented and unit-tested the marker read/consume logic; flagged (and this phase's Ruling 032 confirms) that the no-self-invocation rule is enforced as a **norm**, not a code-level constraint — nothing in the hook or skill mechanically stops an agent from typing `/trivial` itself. This residual risk is accepted, named in every relevant agent file and CLAUDE.md Rule 8, not treated as solved.
+
+### Consequences
+
+- Every agent file that could plausibly hit this block (implementers, tech-lead) should be aware of the no-self-invocation rule; it is currently stated in CLAUDE.md Rule 8 and the skill file itself.
+- If a future incident shows an agent invoking `/trivial` on its own initiative, that is grounds to revisit whether a mechanical constraint (not just a norm) is needed — track as a `docs/TODO.md` follow-up if it happens, not a silent tolerance.
+
+---
+
+## DECISION-031: `worklog-gate.mjs` / `check-ledger.mjs` naming establishes two script-family conventions; harvest provenance is `~/git/npvitals`
+
+**Status:** Resolved
+**Date:** 2026-09-07
+**Feature:** `2026-09-07-verification-contracts`
+
+### Decision
+
+This repo's `scripts/` directory now has two distinct naming families, and future scripts should be named according to which one they are:
+
+- **`*-gate.mjs`** — a live `PreToolUse` hook registered directly in `.claude/settings.json`, firing inside an active session and capable of blocking a tool call. Established by the pre-existing `pre-push-gate.mjs` (Bash matcher); this feature adds the second instance, `scripts/worklog-gate.mjs` (`Edit|Write` matcher) — itself a rename of the harvested `check-worklog.mjs`, because "check" is this repo's other family (below) and would mislabel a hook that fires live, mid-session.
+- **`check-*.mjs`** — a single-purpose `npm run check:x` tripwire, run on demand or folded into the combined `npm run check` alias and `/pre-push` steps, never registered as a live hook. `check-agent-symbols.mjs` (harvested unchanged in name) and `scripts/check-ledger.mjs` (new) join the existing `check-audit-coverage.mjs` / `check-sql-date.mjs` in this family.
+
+**Harvest provenance** (per the commit-standards `Caught-By: agent-review` convention — cross-repo review must name its source): `scripts/worklog-gate.mjs` is adapted from `~/git/npvitals/apps/npvitals/scripts/check-worklog.mjs` (821 lines); `scripts/check-agent-symbols.mjs` is adapted from `~/git/npvitals/scripts/check-agent-symbols.mjs` (161 lines). Both harvests are hook-mode-only ports — Phase 2's architectural review explicitly excluded the harvest's CI-mode layer (`--ci`, `PR_BASE_REF`, GitHub-PR-label reading), which would touch `.github/workflows/*`, outside this feature's declared blast radius.
+
+### Rationale
+
+Before this feature, this repo had exactly one hook-vs-tripwire naming precedent (`pre-push-gate.mjs` alone in the `-gate` family) — not enough to establish a rule on its own. Landing a second `-gate.mjs` script and two more `check-*.mjs` scripts in the same feature is the right moment to state the convention explicitly, rather than let each future contributor re-derive it from a single example.
+
+**Ruling chain:** architect (Phase 2, Placement section) made the naming ruling, including the `check-worklog.mjs` → `worklog-gate.mjs` rename and the decision to keep `check-agent-symbols.mjs`'s harvested name. tech-lead (Phase 3) carried the ruling into the literal script contracts. full-stack-developer (Phase 4) implemented both under the ruled names.
+
+### Consequences
+
+- A future harvested or hand-written script that fires live from `.claude/settings.json` gets a `-gate.mjs` name; a future `npm run check:x` tripwire gets a `check-*.mjs` name. Neither family currently has a dedicated `.test.mjs` requirement — `pre-push-gate.mjs` and `worklog-gate.mjs` (both hooks with meaningful pure-function surface) have one; the single-purpose grep tripwires (`check-audit-coverage.mjs`, `check-sql-date.mjs`, `check-agent-symbols.mjs`, `check-ledger.mjs`) do not, matching the pattern already established before this feature.
+
+---
+
+## DECISION-030: First non-`Bash` `PreToolUse` hook — `Edit`/`Write` — added as a second matcher block; fail-open is the mandatory posture for this hook class
+
+**Status:** Resolved
+**Date:** 2026-09-07
+**Feature:** `2026-09-07-verification-contracts`
+
+### Decision
+
+`.claude/settings.json`'s `PreToolUse` array gains a second entry, `{ "matcher": "Edit|Write", "hooks": [...] }`, appended alongside the existing `{ "matcher": "Bash", ... }` entry (`pre-push-gate.mjs`) — not merged into it. This is this repo's first hook capable of blocking an in-session file edit (`Edit`/`Write`) rather than a shell command (`Bash`).
+
+Any hook registered on this matcher class **must fail open** on every ambiguous condition: unparseable stdin, a missing directory the hook depends on, a git-plumbing failure, or any other exception it did not anticipate. `scripts/worklog-gate.mjs` implements this by returning `allow` (exit 0) on all of the above, matching `pre-push-gate.mjs`'s existing house style for its own hook class.
+
+### Rationale
+
+`pre-push-gate.mjs`'s blast radius is bounded — it only ever blocks `git push`, a rare, late-session action, and a bug there costs one retry. An `Edit`/`Write` hook's blast radius is categorically larger: it evaluates on every file edit, in every session, for every fork that keeps this hook registered. A bug that fails **closed** here does not fail one command, it bricks every `Edit`/`Write` call to the hook's trigger paths until someone notices and hand-edits `.claude/settings.json` to remove it. Given that risk asymmetry, this repo's posture for this hook class is unambiguous: an unhandled condition must resolve to "let the edit through," never "block everything."
+
+**Ruling chain:** architect (Phase 2, Placement + Invariants Touched) ruled the registration shape (second array entry, not merged) and named the blast-radius asymmetry as the reason this hook class gets unusually strict fail-open scrutiny. tech-lead (Phase 3) specified the literal fail-open branches (missing `docs/work-log/`, stdin parse error, git-plumbing failure). full-stack-developer (Phase 4) implemented and live-smoke-tested each fail-open path against an isolated scratch repo.
+
+### Consequences
+
+- Any future `PreToolUse` hook on `Edit`/`Write` (or any other tool-call-blocking matcher beyond `Bash`) should be reviewed against this same fail-open bar before it merges — the risk asymmetry named here applies to the matcher class, not just this specific hook.
+- The live Claude Code harness's exact stdin payload shape for an `Edit`/`Write` `PreToolUse` call (`tool_input.file_path`) was exercised only via a direct CLI invocation this session, not a real harness-triggered call — see the Phase 4 work-log section's "What was NOT verified" for the open verification gap, which qa should attempt to close in Phase 5.
+
+---
+
 ## DECISION-029: Periodic reviews consolidated into two recurring slots; work-log template is the single handoff format
 
 **Status:** Resolved

@@ -65,9 +65,26 @@
 
 - [Question for the user]
 
+## Claims Ledger
+
+| # | Claim | Class | Evidence |
+|---|-------|-------|----------|
+| | | E1 / E2 / E3 | |
+
+## What was NOT verified
+
+[Claims this phase depended on but did not independently re-derive or check.]
+
 ---
 
 # Phase 2 — Architectural Review (architect)
+
+## Prior-Phase Spot-Check
+
+[Which prior-phase ledger rows were re-derived — commands re-run, claims re-checked — before
+reading its claimed answers, and any diffs found. A load-bearing diff loops back to the earliest
+affected phase per CLAUDE.md's Development Pipeline section; a non-load-bearing diff is logged
+here and this phase continues (architect's ruling, Phase 2 Notes item 5).]
 
 ## Verdict
 
@@ -87,9 +104,26 @@
 
 [Anything Phase 3 must honor.]
 
+## Claims Ledger
+
+| # | Claim | Class | Evidence |
+|---|-------|-------|----------|
+| | | E1 / E2 / E3 | |
+
+## What was NOT verified
+
+[Claims this phase depended on but did not independently re-derive or check.]
+
 ---
 
 # Phase 3 — Technical Design (tech-lead)
+
+## Prior-Phase Spot-Check
+
+[Which prior-phase ledger rows were re-derived — commands re-run, claims re-checked — before
+reading its claimed answers, and any diffs found. A load-bearing diff loops back to the earliest
+affected phase per CLAUDE.md's Development Pipeline section; a non-load-bearing diff is logged
+here and this phase continues (architect's ruling, Phase 2 Notes item 5).]
 
 ## Summary
 
@@ -134,9 +168,26 @@
 
 [database-admin | api-developer | ux-developer | full-stack-developer]
 
+## Claims Ledger
+
+| # | Claim | Class | Evidence |
+|---|-------|-------|----------|
+| | | E1 / E2 / E3 | |
+
+## What was NOT verified
+
+[Claims this phase depended on but did not independently re-derive or check.]
+
 ---
 
 # Phase 4 — Implementation
+
+## Prior-Phase Spot-Check
+
+[Which prior-phase ledger rows were re-derived — commands re-run, claims re-checked — before
+reading its claimed answers, and any diffs found. A load-bearing diff loops back to the earliest
+affected phase per CLAUDE.md's Development Pipeline section; a non-load-bearing diff is logged
+here and this phase continues (architect's ruling, Phase 2 Notes item 5).]
 
 ## Files Created
 
@@ -159,9 +210,28 @@
 
 [Tradeoffs taken, anything that diverged from the design and why.]
 
+## Claims Ledger
+
+| # | Claim | Class | Evidence |
+|---|-------|-------|----------|
+| | | E1 / E2 / E3 | |
+
+## What was NOT verified
+
+[Claims this phase depended on but did not independently re-derive or check. This heading is
+hook-enforced (`scripts/worklog-gate.mjs`) once this section is substantive — see CLAUDE.md
+Workflow Rule 8.]
+
 ---
 
 # Phase 5 — Verification (qa)
+
+## Prior-Phase Spot-Check
+
+[Which prior-phase ledger rows were re-derived — commands re-run, claims re-checked — before
+reading its claimed answers, and any diffs found. A load-bearing diff loops back to the earliest
+affected phase per CLAUDE.md's Development Pipeline section; a non-load-bearing diff is logged
+here and this phase continues (architect's ruling, Phase 2 Notes item 5).]
 
 **Date:** YYYY-MM-DD
 **Verified by:** qa
@@ -204,9 +274,28 @@ Failures: [...]
 
 *(Auth-touching diffs: PASS requires e2e against a real dev server with an MFA-enrolled seeded user; deferred e2e = BLOCKED.)*
 
+## Claims Ledger
+
+| # | Claim | Class | Evidence |
+|---|-------|-------|----------|
+| | | E1 / E2 / E3 | |
+
+## What was NOT verified
+
+[Claims this phase depended on but did not independently re-derive or check. This heading is
+hook-enforced (`scripts/worklog-gate.mjs`) once this section is substantive — see CLAUDE.md
+Workflow Rule 8.]
+
 ---
 
 # Phase 6 — Shipped vs Intent (analyst)
+
+## Prior-Phase Spot-Check
+
+[Which prior-phase ledger rows were re-derived — commands re-run, claims re-checked — before
+reading its claimed answers, and any diffs found. A load-bearing diff loops back to the earliest
+affected phase per CLAUDE.md's Development Pipeline section; a non-load-bearing diff is logged
+here and this phase continues (architect's ruling, Phase 2 Notes item 5).]
 
 ## VERDICT
 
@@ -239,3 +328,13 @@ Failures: [...]
 ## Red Flags (if NEEDS REWORK)
 
 - [Specific. What has to change before this ships.]
+
+## Claims Ledger
+
+| # | Claim | Class | Evidence |
+|---|-------|-------|----------|
+| | | E1 / E2 / E3 | |
+
+## What was NOT verified
+
+[Claims this phase depended on but did not independently re-derive or check.]

@@ -96,6 +96,34 @@ Vitest runs every `*.test.ts` under `src/`. If a test fails, fix it before pushi
 
 **Do not proceed if any test fails.**
 
+## Step 3e: Ledger-Presence Tripwire
+
+```bash
+npm run check:ledger
+```
+
+`scripts/check-ledger.mjs` scans every `docs/work-log/*.md` dated after the grandfather cutoff
+(Increment 2's ship date) whose Per-Phase Status table marks any phase 3–6 `Complete`, and fails if
+that phase's own section has no `| # | Claim | Class | Evidence |`-shaped Claims Ledger table. Add
+the missing table, or correct the Per-Phase Status entry if the phase isn't actually complete.
+
+**Do not proceed if the ledger-presence check fails.**
+
+## Step 3f: Agent-Symbols Tripwire
+
+```bash
+npm run check:agent-symbols
+```
+
+`scripts/check-agent-symbols.mjs` scans every fenced code block in `.claude/agents/*.md` for a
+retired symbol — a function or export no longer present in `src/`. A stale symbol in a code sample
+is not a documentation nit; it is instructions an agent will copy verbatim into real code. Fix by
+updating the sample to the current API, or removing the `RETIRED` entry if the symbol turns out to
+still be exported after all (the check is self-validating and reports that case rather than
+enforcing a stale entry).
+
+**Do not proceed if the agent-symbols check fails.**
+
 ## Step 4: Production Build
 
 ```bash

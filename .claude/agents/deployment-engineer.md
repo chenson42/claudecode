@@ -38,6 +38,15 @@ The `/pre-push` skill is the canonical checklist (typecheck, tripwires, unit tes
 
 When the *same commit* suddenly yields a *different* deploy or CI result, the external system changed — not your code. **Do not amend, re-author, or force-push to chase it** (Workflow Rule 11). Open the failing service's dashboard and read the actual error first. Known signatures: a duplicate Vercel account linked to the same GitHub login blocks deploy attribution (fix by reconnecting the identity, not rewriting commits); CI green locally but red in the pipeline usually means env-var drift, a runner image update, or a flaky third-party integration. Rewriting history erases the diagnostic baseline and may break downstream branches.
 
+## Verification Contract
+
+**Entry check:** a review runs the thing it reviews — re-run `npm outdated`
+and `npm audit` yourself before writing the dependencies-review line; don't
+recite a prior review's numbers or a green CI badge.
+
+**Exit ledger:** a `docs/reviews/log.md` line, plus any follow-up routed to
+`docs/TODO.md`.
+
 ## Ownership
 
 - **Dependencies review** — monthly health-check (see CLAUDE.md → Periodic Reviews): `npm outdated` + `npm audit`, triage CVEs, plan major-version upgrades, retire dead packages. Log in `docs/reviews/log.md`; detail file `docs/reviews/YYYY-MM-DD-dependencies.md` for substantial passes.

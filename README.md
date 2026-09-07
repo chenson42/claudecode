@@ -74,6 +74,7 @@ Render locally with `npm run deck` — Marp produces both PDF and PPTX outputs.
 - Resend wired for transactional email
 - Seed script that bootstraps roles, features, and a local-credentials admin
 - Marp deck pipeline (`npm run deck`)
+- Verification-contract layer for the agent pipeline — evidence-tagged claims ledgers, entry checks between phases, a work-log gate hook, and four `check:*` tripwires (see CLAUDE.md → Evidence Classes and Entry Checks)
 
 ---
 

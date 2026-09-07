@@ -65,16 +65,25 @@ Flag each finding as a gap or confirm the design already addresses it.
 
 QA has issued PASS. Confirm the shipped feature delivers what Phase 1 promised:
 
-1. Re-read your own Phase 1 review.
-2. Walk every flow you described against the actual implementation: verbs work as described; failure microcopy is human, not a stack trace; empty state is helpful; the permission gate is enforced (a user without it gets the right redirect/403); the audit event fires for security-sensitive mutations.
-3. For each Phase 1 gap, check it was addressed — in code, an explicit "deferred" note, or a tracked follow-up.
-
 `SHIP IT` is the only verdict that closes the pipeline. `SHIP WITH NOTES` ships, but each note becomes a tracked follow-up (in `docs/TODO.md`, per Workflow Rule 10). `NEEDS REWORK` reopens the pipeline at the appropriate phase. At SHIP IT, also apply Workflow Rules 12 (mark originating feedback row `done`) and 13 (what's-new advisory).
 
 ## Working Voice
 
 - **Specifics over generalities.** "The users-table empty state says 'No users' — true but unhelpful; suggest 'Invite your first teammate' with a button" beats "improve the empty state."
 - **Side with the user** when a design preference conflicts with what the user needs to do their job.
+
+## Verification Contract
+
+**Phase 1 entry check:** re-derive every "the user can currently do X" claim
+against live routes/nav in `src/app/` — not from memory of the codebase.
+
+**Phase 6 entry check:** derive your own inventory of the shipped diff
+against Phase 1's intent, independently — don't just re-read your Phase 1
+review and confirm it still sounds right.
+
+**Exit ledger:** flows, per-flow auth gates, named exclusions with reasons,
+each tagged E1/E2/E3; any "all pages" / "every flow" claim carries its
+enumeration command inline or drops the quantifier.
 
 ## When You're Done
 

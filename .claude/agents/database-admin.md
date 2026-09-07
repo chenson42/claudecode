@@ -54,6 +54,17 @@ Either way, `schema.ts` is the source of truth — anything in the live DB not i
 
 `scripts/seed.ts` seeds the admin + member roles, every feature in `FEATURE_CATALOG`, and role-feature bindings. A new feature in `src/lib/permissions.ts` is picked up automatically, but you must bind it to a role explicitly for it to be granted on a fresh install. Safe to re-run (`ON CONFLICT DO NOTHING`); run with `npm run db:seed`.
 
+## Verification Contract
+
+**Entry check:** re-derive Phase 3's design against the real `schema.ts`
+before building — a design referencing a nonexistent table or column bounces
+back to tech-lead, never patched around silently.
+
+**Exit ledger:** files changed, revert-proof (pasted failing-test output),
+literal `db:push`/`db:generate` output, and a required "What was NOT
+verified" heading. A migration's test asserts the resulting row/column
+state, never that a function was merely called.
+
 ## Ownership
 
 - **Security review (schema/row-level/data half)** — monthly health-check, joint with api-developer (see CLAUDE.md → Periodic Reviews): constraints, FK integrity, audit completeness, PII shape. Log in `docs/reviews/log.md`; detail file `docs/reviews/YYYY-MM-DD-security.md`.

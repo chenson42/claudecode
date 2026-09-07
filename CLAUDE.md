@@ -119,7 +119,7 @@ Agents live in `.claude/agents/`. Spawn the right one for the phase.
 
 **Every feature flows through the six-phase pipeline below. Work is not complete until analyst issues SHIP IT in Phase 6.**
 
-When handing off between phases, preserve the prior phase's full output in the work-log. Do not summarize away the analyst's gaps or the architect's invariant rulings.
+When handing off between phases, preserve the prior phase's full output in the work-log. Do not summarize away the analyst's gaps or the architect's invariant rulings. Each agent file's own **Verification Contract** section states its phase's entry check and exit-ledger requirement in full — this table does not duplicate it.
 
 ## Development Pipeline
 
@@ -137,6 +137,20 @@ Before editing a file, creating a branch, or invoking an implementer agent, clas
 If the request is ambiguous, default to **Feature**. Do not invent a lower classification to avoid the pipeline.
 
 Phases run 1 → 2 → 3 → 4 → 5 → 6. Loop-backs are expected, and a loop-back from any later phase returns to the **earliest** phase where the failure originated, not just the previous phase.
+
+### Evidence Classes and Entry Checks
+
+Every Claims Ledger row (`docs/work-log/_template.md`) carries one of three evidence classes:
+
+- **E1 — executed.** A command was run this session; its literal output is the evidence.
+- **E2 — derived.** Read directly from a primary source (a file, a schema, another phase's cited line) but not run. A citation quotes the line, not just the filename.
+- **E3 — reasoned.** An inference or judgment call. Legal, but must be labeled — an unlabeled quantified claim ("all pages redirect correctly," "every flow is gated") is E3 by default, and should carry its enumeration command inline or drop the quantifier.
+
+**Entry-check rule.** Before building on a prior phase's output, re-derive its E1 commands and E2 claims *before reading its claimed answers* — derive-then-diff, never read-then-confirm — then diff against what the prior phase wrote. A **load-bearing** diff (one that would change the prior phase's verdict, gaps, or a ruling this phase depends on) triggers the standard loop-back above, to the earliest affected phase. A **non-load-bearing** diff (it sharpens or corrects a detail without changing any depended-upon conclusion) is logged in this phase's own "Prior-Phase Spot-Check" section and the phase continues. Logging is never a way to route around a loop-back that a load-bearing diff actually requires.
+
+**No-self-issued-verdicts rule.** A phase reports its own evidence; the *next* phase grades it — never the same phase, never the same invocation. This is why Phase 5 cannot accept an implementer's own "this works" as a substitute for qa's independent verification, and why Phase 6 cannot accept a Phase 5 PASS without analyst's own independent flow-walk against Phase 1's intent. In the Bug-Fix Variant, the implementer's Phase 4 confirmation that a regression test passes is **provisional** — it stands only until Phase 6 independently confirms the bug no longer manifests; an implementer-verified fix is not yet a shipped one.
+
+**Cross-model check at the judgment gates.** When practical, spawn Phase 5 (qa) and the Phase 6 invocation of analyst with a `model` override distinct from whatever model ran Phase 4 — cheap insurance against same-model blind spots, not a hard requirement. `analyst.md` serves both Phase 1 (no override needed) and Phase 6 (override applies) from the same file — the override is an invocation-time choice, not something the agent file itself encodes.
 
 ### Phase 1 — Functional Refinement (analyst)
 
@@ -171,21 +185,21 @@ Phases run 1 → 2 → 3 → 4 → 5 → 6. Loop-backs are expected, and a loop-
 | React components, pages, forms | **ux-developer** |
 | Spans server + client and is small | **full-stack-developer** |
 
-**Gate:** Typecheck and build pass. `npm run check:audit` reports zero violations. No native browser dialogs. No `console.log` left in production paths. All invariants honored. Audit events written for security-sensitive mutations. **For any feature that touches `src/auth.ts`, `src/app/(auth)/`, `src/app/api/auth/`, or `src/lib/auth/`, a running-server e2e smoke covering the full login path (including an MFA-enrolled user) is required before Phase 5 can begin — module-resolution defects are invisible to unit tests.**
+**Gate:** Typecheck and build pass. `npm run check:audit` reports zero violations. No native browser dialogs. No `console.log` left in production paths. All invariants honored. Audit events written for security-sensitive mutations. **For any feature that touches `src/auth.ts`, `src/app/(auth)/`, `src/app/api/auth/`, or `src/lib/auth/`, a running-server e2e smoke covering the full login path (including an MFA-enrolled user) is required before Phase 5 can begin — module-resolution defects are invisible to unit tests.** A Claims Ledger with a "What was NOT verified" section is required (see Evidence Classes and Entry Checks) — `scripts/worklog-gate.mjs` enforces the heading mechanically on any qualifying work-log's substantive Phase 4 section.
 **Loop-back:** Design unbuildable returns to Phase 3. Architectural problem discovered returns to Phase 2.
 
 ### Phase 5 — Test Verification (qa)
 
 **Trigger:** Implementer reports Phase 4 complete.
 **Output:** Verification report in the work-log (format: `docs/work-log/_template.md` Phase 5 section).
-**Gate:** Verdict must be `PASS` or `BLOCKED`. **On auth-touching features (see Phase 4 gate), `PASS` requires the e2e suite ran against a real dev server with an MFA-enrolled seeded user. A deferred or skipped e2e check produces `BLOCKED`, not `PASS` — a deferred advisory is not a green light.**
+**Gate:** Verdict must be `PASS` or `BLOCKED`. **On auth-touching features (see Phase 4 gate), `PASS` requires the e2e suite ran against a real dev server with an MFA-enrolled seeded user. A deferred or skipped e2e check produces `BLOCKED`, not `PASS` — a deferred advisory is not a green light.** qa independently re-derives Phase 4's Claims Ledger rather than trusting it, per the no-self-issued-verdicts rule (see Evidence Classes and Entry Checks).
 **Loop-back:** `FAIL` returns to the implementer (Phase 4) with failing tests cited `file:line`. `BLOCKED` returns to the user with the unmet prerequisite named. If a failure reveals a design flaw, escalate to Phase 3.
 
 ### Phase 6 — Shipped vs Intent (analyst)
 
 **Trigger:** QA's PASS.
 **Output:** Final verdict comparing the shipped feature to the Phase 1 description.
-**Gate:** Verdict must be `SHIP IT`. **No other verdict closes the pipeline.**
+**Gate:** Verdict must be `SHIP IT`. **No other verdict closes the pipeline.** analyst's verdict rests on its own independent Prior-Phase Spot-Check and flow-walk, not a re-read of Phase 5's PASS (see Evidence Classes and Entry Checks).
 **Loop-back:** `SHIP WITH NOTES` ships, but each note becomes a tracked follow-up. `NEEDS REWORK` returns to Phase 3 or 4 depending on the issue.
 
 ### Bug-Fix Variant
@@ -257,10 +271,10 @@ Slugs are short, lowercase, hyphenated, and stable. Don't rename them after the 
 2. **No native browser dialogs.** `alert()`, `confirm()`, `prompt()` are forbidden anywhere in the app. Use shadcn `Dialog` (and `AlertDialog` for destructive confirms).
 3. **No secrets in committed files.** `.env.local` is gitignored; never read from `.env` files into committed code.
 4. **Document decisions.** Architectural or implementation decisions go to `docs/decisions.md` (newest first, numbered).
-5. **Use `/pre-push` before every push to `main`.** Typecheck, build, schema check, release notes. The skill never pushes — it only reports readiness.
+5. **Use `/pre-push` before every push to `main`.** Typecheck, build, schema check, release notes, plus the ledger-presence (`check:ledger`) and agent-symbols (`check:agent-symbols`) tripwires — hard blocks, same as the existing audit/sql-date checks. The skill never pushes — it only reports readiness.
 6. **Permissions and flags stay separate.** See Key Invariants → Permissions vs Flags.
 7. **Audit security-sensitive mutations.** Role changes, flag toggles, TOTP enrolment/reset, deactivations write to `audit_events` (use `recordAudit()`).
-8. **No code before the work-log.** If you are about to call Edit, Write, or `git checkout -b` for a non-trivial request and there is no work-log entry for it, stop and run `/new-feature` first. The Classification table defines "non-trivial."
+8. **No code before the work-log.** If you are about to call Edit, Write, or `git checkout -b` for a non-trivial request and there is no work-log entry for it, stop and run `/new-feature` first. The Classification table defines "non-trivial." Mechanically enforced on `src/**`/`drizzle/**` by the `scripts/worklog-gate.mjs` PreToolUse hook on `Edit`/`Write` (`.claude/settings.json`) — it blocks until a qualifying work-log exists, and fails open only on a missing `docs/work-log/` directory, a stdin parse error, or a git-plumbing failure. The hook has no self-service bypass: a genuinely Trivial edit needs the operator — never the agent — to run `/trivial <path> "<reason>"` first, which stamps a single-use, 10-minute exemption marker. An agent must never invoke `/trivial` on its own initiative to route around a block it received; surface the block to the operator and wait instead.
 9. **Use `/merge-pr` for any PR merged with `--delete-branch`.** Before deleting the head branch, the skill retargets open PRs based on that branch to `main` — otherwise GitHub auto-closes every downstream PR (this bit the npvitals fork twice in one session). Invoke once per PR, bottom-up, when merging a stack. Plain `gh pr merge` is only safe when the PR has no dependents *and* you're not deleting the branch.
 10. **Keep `docs/TODO.md` reconciled in the same commit as the work.** Shipping something? Move its line to Done (with date) in that commit. Deferring, discovering a follow-up, or accepting a review punch-list item? Add a line in that commit. Phase 6 `SHIP WITH NOTES` follow-ups land here, not just in the work-log. A commit that changes what's open without touching `docs/TODO.md` is incomplete — `/pre-push` flags it.
 11. **Never amend or force-push to diagnose an external-system failure.** When the same commit suddenly yields a different deploy or CI result, the external system changed — not your code. Get ground truth from the failing service's dashboard before touching git history.
@@ -312,7 +326,9 @@ npm run db:migrate   # Apply committed SQL migrations (production-safe; use inst
 npm run db:seed      # Seed roles, features, and the demo flag
 npm run check:audit  # Tripwire: every mutation in actions.ts files must reference an AUDIT_ACTIONS key
 npm run check:sql-date # Tripwire: bans sql<Date> typings (neon-http returns strings for raw-SQL dates)
-npm run check        # Both tripwires in sequence
+npm run check:agent-symbols # Tripwire: no agent-file code sample calls a retired symbol
+npm run check:ledger # Tripwire: every in-scope Complete phase (post-cutoff work-logs) has a Claims Ledger
+npm run check        # All four tripwires in sequence
 npm run stats:escape # 30-day escape-rate report (per-channel fix breakdown for the retrospective)
 npm run deck         # Render deck/slides.md → slides.pptx + slides.pdf
 npm run deck:pptx    # PowerPoint only

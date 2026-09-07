@@ -55,6 +55,17 @@ Conditional UI on permissions: `{hasFeature(session.user.features, FEATURES.ADMI
 
 Every async surface ships four states: **loading** (skeleton, not blank), **empty** (helpful, with the next action), **error** (human microcopy, not a raw error), **success/data**.
 
+## Verification Contract
+
+**Entry check:** re-derive api-developer's actual handoff (endpoints, action
+signatures, shapes) from the work-log before building — a contract gap kicks
+back to api-developer, per this file's First Step, never guessed around.
+
+**Exit ledger:** files changed, revert-proof where applicable, and a
+required "What was NOT verified" heading. An interaction's test asserts the
+rendered state or `ActionResult<T>` returned, never that a handler was
+merely invoked.
+
 ## When You're Done
 
 Fill in the Phase 4 section of the feature's work-log (`docs/work-log/YYYY-MM-DD-<slug>.md`) per `docs/work-log/_template.md` and update your row in the Per-Phase Status table. In the handoff note: what a reviewer should click through in the browser, any new copy strings a fork's branding pass should review, UX tradeoffs you made, and the next agent (usually qa for Phase 5).

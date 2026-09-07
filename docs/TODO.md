@@ -18,6 +18,7 @@ detail lives in the linked doc, not here.
 
 ## Next Up
 
+- [ ] Verify the work-log gate fires live at next session start — operator: attempt an uncovered `src/` edit from a clean tree (no same-day work-log) and confirm the `[worklog-gate] BLOCKED` message appears; the hook has never fired inside a real harness session, only via direct CLI stdin — Phase 6 2026-09-07-verification-contracts
 - [ ] **URGENT — next-auth `5.0.0-beta.31` → `beta.32`** via a proper auth pipeline (full e2e gate, MFA user): clears 2 critical + 1 high Auth.js advisories in `@auth/core` (GHSA-xmf8-cvqr-rfgj uncaught exception on malformed Bearer header, GHSA-7rqj-j65f-68wh email-normalizer homoglyph bypass, GHSA-x445-f3h2-j279 OAuth state/nonce/PKCE cookies not provider-bound). Outside the pinned range, so `npm audit fix` can't take it. Then remove `continue-on-error` from the CI audit step — found during 2026-08-09 pre-push
 - [ ] Configure `NEON_API_KEY` + `NEON_PROJECT_ID` repo secrets to activate e2e CI (optional: `ANTHROPIC_API_KEY` for Claude PR review); watch the first live run of both workflows (pinned Neon action versions unverified until then) — enforcement batch residual
 
@@ -35,6 +36,9 @@ detail lives in the linked doc, not here.
 
 ## Backlog
 
+- [ ] `check:ledger` presence ≠ substance: an empty `| # | Claim | Class | Evidence |` table (template copy) satisfies the check — tighten to require ≥1 populated row (the hole is pinned by `check-ledger.test.mjs`'s "empty ledger table passes" test, so tightening is a deliberate test-breaking act) — Phase 6 2026-09-07-verification-contracts
+- [ ] Freshness leg is broad by design (`mention || same-day-fresh`: any work-log touched today qualifies every `src/**` path all session) — revisit after a few weeks of live use; cheapest tightening is an advisory line naming which work-log qualified, so a wrong qualification is at least visible — Phase 6 2026-09-07-verification-contracts
+- [ ] One-line doc restorations: reinstate the "two admin export routes once shipped without `hasFeature()`" incident clause in `qa.md`'s Feature-Gate Audit (deleted with the absorbed framing sentence; the instruction survives, the incident memory doesn't) · fix DECISION-031's now-stale "check-ledger.mjs does not [have a test]" sentence (Phase 5 added `check-ledger.test.mjs` after that entry was written) — Phase 6 2026-09-07-verification-contracts
 - [ ] Fable review C2: package the `.claude/` process layer as a Claude Code plugin (versioned `plugin.json`, marketplace-installable) — candidate successor to fork-and-copy + `upstream-sync` diffing
 - [ ] Fable review C3: move auth/server-action rules into path-scoped `.claude/rules/*.md` to relieve CLAUDE.md load
 - [ ] Fable review C5: test-tampering ratchet (commit failing tests before implementation, tests frozen during Phase 4) + evaluate mutation testing as a future `check:*` tripwire
@@ -44,6 +48,7 @@ detail lives in the linked doc, not here.
 - [ ] Batch-bump routine low-risk deps (Radix, Tailwind patch, React types, Resend, otplib, lucide, tsx, Playwright, Vitest) in one PR — deps 2026-07-11
 - [ ] Watch for `drizzle-kit@1.0.0` stable (resolves esbuild GHSA-67mh-4wv8-2f99; treat as major-version project with Neon branch smoke) — deps 2026-07-11; Next 16.3.0 taken 2026-08-09 (resolved the bundled-postcss CVEs; 48/48 e2e)
 - [ ] Consider a `db.transaction(`-with-neon-http grep tripwire (mirror of check:sql-date) — the BUG-1 class; retro 2026-07-11 #2
+- [ ] `check:audit` wrong-vs-missing gap: the adjacency heuristic catches a *missing* audit call but not a *wrong* one (e.g. `.returning()`-gated audit that never fires); generalizing it is real static analysis, not a grep — descoped from verification contracts (design §6.5), retro 2026-09-07 #2
 - [ ] Schema comment on `emailQueue` pointing at `RawQueueRow`/`fromRaw()` in `src/lib/email/queue.ts` so future columns don't silently skip the atomic-claim path — code 2026-07-11
 - [ ] ADR for the "text, not pgEnum" status-column convention (or add DB CHECK constraints) — security 2026-07-11 (observational)
 - [ ] Next release slot: run a standalone test-coverage sweep (don't rely on incidental Phase 5 numbers) — retro 2026-07-11 #6
@@ -61,6 +66,7 @@ detail lives in the linked doc, not here.
 
 ## Done
 
+- [x] 2026-09-07 — Verification contracts for the agent pipeline: E1/E2/E3 evidence classes + per-phase Claims Ledgers + derive-then-diff entry checks (CLAUDE.md + template + nine agent contract sections), `worklog-gate.mjs` Edit/Write PreToolUse hook + `/trivial` exemption skill, `check:ledger` + `check:agent-symbols` tripwires (DECISION-030..033), cross-model P5/P6 override (covers part of Fable E5), quantifier linter built→measured ~5% TP→deleted per kill criterion — SHIP WITH NOTES (follow-ups above) — `docs/work-log/2026-09-07-verification-contracts.md`
 - [x] 2026-08-09 — Enforcement batch from the Fable external review: CI runs both tripwires + `npm audit` + commit-grammar job; dependabot; e2e-in-CI on ephemeral Neon branch + playwright `webServer`; cadence-check SessionStart hook; pre-push PreToolUse gate (Rule 5 mechanized); `Work-Log:` commit trailer (required on feat/fix); `AGENTS.md` shim; opt-in Claude PR review — `docs/work-log/2026-08-09-enforcement-batch.md`
 - [x] 2026-07-13 — PR #3 closed as superseded (its skill copy was the pre-generalization fork variant; main's port from 20fb316 stands); contribution kit landed as `docs/starter-contributions/README.md` with a live-status banner (stale "dormant" caveat + top-down PR order removed); fork-sync skills + kit added to the functionality map
 - [x] 2026-07-12 — Functionality map harvested from huddleup.health: `docs/product/functionality-map.md` + SessionStart index hook + Workflow Rule 14 + release-notes/personalize-starter wiring — `docs/work-log/2026-07-12-functionality-map.md`

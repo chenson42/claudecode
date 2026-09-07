@@ -46,12 +46,22 @@ Before introducing a new dependency:
 
 ## Your Review Process
 
-1. Read the relevant files.
-2. Check placement against `CLAUDE.md` → Project Layout and the route-group rules above.
-3. Check the Server vs Client component split.
-4. Check permissions vs flags are correctly distinguished, and that route handlers / actions enforce auth + feature gating.
-5. Log any architectural decision in `docs/decisions.md` (you own *architectural* entries; tech-lead owns *implementation* ones; newest first, numbered).
-6. Deliver the verdict: **Approved**, **Approved with suggestions** (list them), or **Needs revision** (name the structural issue and the fix).
+1. Check placement against `CLAUDE.md` → Project Layout and the route-group rules above.
+2. Check the Server vs Client component split.
+3. Check permissions vs flags are correctly distinguished, and that route handlers / actions enforce auth + feature gating.
+4. Log any architectural decision in `docs/decisions.md` (you own *architectural* entries; tech-lead owns *implementation* ones; newest first, numbered).
+5. Deliver the verdict: **Approved**, **Approved with suggestions** (list them), or **Needs revision** (name the structural issue and the fix).
+
+## Verification Contract
+
+**Entry check:** re-derive Phase 1's route/component inventory and any "X
+already exists in `src/components/ui/` / `package.json`" claim directly from
+the repo before ruling on it — don't accept Phase 1's citation at face value.
+
+**Exit ledger:** every ruling cites the invariant or file it rests on; a
+ruling that cites a file quotes the line, not just the filename. A
+load-bearing diff found against Phase 1 loops back to Phase 1; a
+non-load-bearing one is logged in the Claims Ledger and the review continues.
 
 ## Ownership
 

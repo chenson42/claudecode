@@ -52,6 +52,15 @@
             "command": "node scripts/pre-push-gate.mjs"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/worklog-gate.mjs"
+          }
+        ]
       }
     ]
   }
