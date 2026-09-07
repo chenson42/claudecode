@@ -27,6 +27,7 @@ For no-op reviews (a cycle genuinely produced no actionable findings): `nothing 
 ## Entries
 
 <!-- newest entries go here, above the older ones -->
+2026-09-07 | retrospective | idle window (4 commits, 0 fixes, 0 bypasses) — no local escape data; adopted sibling npvitals mechanism split (effect-not-invocation + unverified quantifiers) as Increment-3 weighting for verification contracts; see 2026-09-07-retrospective.md
 2026-08-09 | external-review | Fable 5 first pass (starter + process + AI-SDLC industry research): core finding "process knows things it doesn't enforce" — e2e absent from CI despite retro naming it sole defense; 8 enforcement gaps, commit↔work-log trailer missing, 5 efficiency cuts; escape-rate trailers judged industry-leading; see 2026-08-09-fable-external-review.md
 2026-07-11 | retrospective | Pipeline healthy: all 6 edits from 05-17 landed; 1 formal loop-back across 25 pipelines (caught real hook defect); 0 trailer bypasses; risk: 57% of fixes found post-merge, 100% agent-review — e2e gate is sole defense for runtime/framework bug class; 8 punch items; see 2026-07-11-retrospective.md
 2026-07-11 | security | 0 critical/high, 1 medium (new: admin/2fa actions lack independent hasFeature check, mitigated by proxy edge gate), 4 low, 3 informational; 6 of 10 prior findings fixed and verified; see 2026-07-11-security.md
